@@ -13,6 +13,3 @@ def get_messages(payload: dict | None = None) -> list:
 
     data = response.json()
     return data["messages"]["records"]
-
-teste = get_messages()
-

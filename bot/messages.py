@@ -33,14 +33,17 @@ def build_history(messages):
     history = {}
 
     for msg in messages:
-        if msg['from_me'] is False:
-            number = msg["number"]
+        number = msg["number"]
 
         if number not in history:
             history[number] = {
-                "push_name": msg["push_name"],
+                "push_name": None,
                 "messages": [],
             }
+
+        # Só guarda o nome quando a mensagem veio da outra pessoa
+        if msg["from_me"] is False and msg["push_name"]:
+            history[number]["push_name"] = msg["push_name"]
 
         history[number]["messages"].append({
             "from_me": msg["from_me"],
