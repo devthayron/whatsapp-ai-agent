@@ -16,17 +16,17 @@ def get_messages(payload: dict | None = None) -> list:
 
 
 def get_messages_by_number(number: str) -> list:
-    """Obtém o histórico de mensagens da Evolution API filtrado por um número específico."""
+    target = f"{number}@s.whatsapp.net"
 
-    payload = {
-        "where": {
-            "key": {
-                "remoteJid": f"{number}@s.whatsapp.net"
-            }
-        }
-    }
+    registros = get_messages({})
 
-    return get_messages(payload)
+    def bate(registro):
+        key = registro.get("key", {})
+        remote_jid = key.get("remoteJid") or ""
+        remote_jid_alt = key.get("remoteJidAlt") or ""
+        return remote_jid == target or remote_jid_alt == target
+
+    return [r for r in registros if bate(r)]
 
 
 def send_message(number: str, text: str) -> dict:

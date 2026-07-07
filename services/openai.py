@@ -3,13 +3,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SYSTEM_INSTRUCTIONS = (
-    "Você é um chatbot de WhatsApp da empresa Guara. "
-    "Responda de forma natural, direta e sem usar markdown. "
-    "Cada mensagem do histórico começa com o horário em que foi enviada, "
-    "no formato [dd/mm HH:MM]. Use isso pra entender o tempo entre as mensagens "
-    "(ex: se o cliente sumiu e voltou depois), mas não repita o horário na sua resposta."
-)
+
+PROMPT = {
+    "id": "pmpt_6a4c03086f2081939978a699ca50ad7d0fe8ed8ab07bf32a",
+    "version": "1"
+}
 
 
 class OpenAIService:
@@ -17,11 +15,11 @@ class OpenAIService:
         self.client = OpenAI()
         self.model = "gpt-5.4-nano"
 
-    def generate_response(self, messages) -> str:
+    def generate_response(self, messages: list) -> str:
         response = self.client.responses.create(
             model=self.model,
-            input=messages,
-            instructions=SYSTEM_INSTRUCTIONS,
+            prompt=PROMPT,
+            input=messages
         )
 
         return response.output_text

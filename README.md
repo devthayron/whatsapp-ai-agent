@@ -1,52 +1,54 @@
-# chatbot-evo
+# Chatbot WhatsApp com IA
 
-Script em Python para extrair o histórico de mensagens de uma instância do WhatsApp conectada via [Evolution API](https://doc.evolution-api.com/) e armazenar cada conversa em um arquivo JSON separado.
+Chatbot para WhatsApp desenvolvido em Python utilizando FastAPI, Evolution API e OpenAI.
 
-## O que ele faz
-
-- Busca as mensagens registradas em uma instância da Evolution API (`/chat/findMessages/{instance}`).
-- Filtra apenas mensagens de texto (`conversation`), ignorando outros tipos (imagem, áudio, etc.).
-- Processa cada mensagem individualmente.
-- Salva cada conversa em um arquivo JSON separado dentro de `data/conversations/`, utilizando o número do contato como nome do arquivo.
+O projeto recebe mensagens através de um webhook da Evolution API, mantém o histórico de cada conversa, envia o contexto para a OpenAI e responde automaticamente ao usuário pelo WhatsApp.
 
 ---
 
-## Envio de mensagem (teste)
+## Funcionalidades
 
-Para enviar uma mensagem manualmente via Evolution API, edite o arquivo `tests/send_test.py` e substitua o número pelo real::
-
-```python
-from services.evolution import send_message
-
-if __name__ == "__main__":
-    numero = "5586999999999"  # substitua pelo número real
-    texto = "enviando msg pelo python"
-
-    send_message(numero, texto)
-    print("Mensagem enviada!")
-```
-
-Execute o teste com:
-
-```bash
-python -m tests.send_test
-```
+- Integração com Evolution API
+- Webhook para recebimento de mensagens
+- Integração com OpenAI
+- Memória de conversa por contato
+- Histórico no formato compatível com a OpenAI
+- Respostas automáticas pelo WhatsApp
+- Estrutura modular para facilitar manutenção e escalabilidade
 
 ---
 
 ## Arquitetura
 
 ```text
-
-Evolution API (WhatsApp)
-   ↓
-get_messages()
-   ↓
-process_message()
-   ↓
-save_conversation()
-   ↓
-JSON por contato
+WhatsApp
+    │
+    ▼
+Evolution API
+    │
+    ▼
+Webhook (FastAPI)
+    │
+    ▼
+Processamento da mensagem
+    │
+    ▼
+Persistência da conversa (JSON)
+    │
+    ▼
+Histórico da conversa
+    │
+    ▼
+OpenAI API
+    │
+    ▼
+Resposta da IA
+    │
+    ▼
+Evolution API
+    │
+    ▼
+WhatsApp
 ```
 
 ---
@@ -54,43 +56,90 @@ JSON por contato
 ## Estrutura do projeto
 
 ```text
-chatbot-evo/
+chatbot/
+├── app/
+│   ├── main.py                # Inicialização da API
+│   ├── routes/
+│   │   ├── webhook.py         # Recebe mensagens
+│   │   └── chat.py
+│   └── schemas/
+│
 ├── bot/
-│   └── processor.py          # processamento das mensagens
-├── data/
-│   └── conversations/       # histórico separado por contato
+│   └── processor.py           # Processamento das mensagens
+│
 ├── services/
-│   └── evolution.py         # integração com a Evolution API
+│   ├── evolution.py           # Evolution API
+│   └── openai.py              # OpenAI API
+│
 ├── storage/
-│   └── conversations.py     # leitura e escrita das conversas
-├── tests/
-│   └── send_test.py
+│   └── conversations.py       # Memória das conversas
+│
+├── data/
+│   └── conversations/         # Histórico em JSON
+│
 ├── config.py
-├── main.py
 ├── requirements.txt
-├── .env.example
-└── .gitignore
+└── README.md
 ```
 
 ---
 
-## Pré-requisitos
+## Tecnologias
 
-- Python 3.10+
-- Uma instância ativa na Evolution API
-- API Key da instância
+- Python 3.12
+- FastAPI
+- OpenAI API
+- Evolution API
+- Uvicorn
+- python-dotenv
+
+---
+
+## Como funciona
+
+Quando uma nova mensagem chega:
+
+1. O webhook recebe a mensagem enviada pela Evolution API.
+2. A mensagem é processada.
+3. O histórico da conversa é atualizado.
+4. O histórico é convertido para o formato esperado pela OpenAI.
+5. A IA gera uma resposta utilizando o contexto da conversa.
+6. A resposta é salva.
+7. A resposta é enviada ao usuário pelo WhatsApp.
 
 ---
 
 ## Instalação
 
+Clone o projeto
+
 ```bash
-git clone https://github.com/devthayron/chatbot-evo.git
-cd chatbot-evo
+git clone https://github.com/devthayron/chatbot.git
 
+cd chatbot
+```
+
+Crie o ambiente virtual
+
+```bash
 python -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
+```
 
+Linux
+
+```bash
+source venv/bin/activate
+```
+
+Windows
+
+```powershell
+venv\Scripts\activate
+```
+
+Instale as dependências
+
+```bash
 pip install -r requirements.txt
 ```
 
@@ -98,95 +147,69 @@ pip install -r requirements.txt
 
 ## Configuração
 
-Copie o `.env.example` para `.env`:
-
-```bash
-cp .env.example .env
-```
-
-Preencha:
+Crie um arquivo `.env`
 
 ```env
-BASE_URL=http://seu-servidor-evolution:8080
-API_KEY_EVO=sua_api_key
-INSTANCE=nome_da_instancia
-```
+OPENAI_API_KEY=
 
-| Variável       | Descrição                  |
-| --------------- | ---------------------------- |
-| `BASE_URL`    | URL base da Evolution API    |
-| `API_KEY_EVO` | API Key da instância        |
-| `INSTANCE`    | Nome da instância utilizada |
+BASE_URL=
+INSTANCE=
+API_KEY_EVO=
+```
 
 ---
 
-## Uso
-
-Execute:
+## Executando
 
 ```bash
-python main.py
+uvicorn app.main:app --reload
 ```
 
-Saída esperada:
+A API ficará disponível em:
 
-```text
-Mensagens processadas: 21
-Mensagens ignoradas: 1
 ```
-
-Após a execução, será criada a pasta:
-
-```text
-data/
-└── conversations/
-    ├── 5511999999999.json
-    ├── 5586999999999.json
-    └── 5599888888888.json
+http://localhost:8000
 ```
 
 ---
 
-## Exemplo de arquivo de conversa
+## Exemplo de conversa armazenada
 
 ```json
 {
-    "number": "5599999999999",
-    "push_name": "João",
-    "messages": [
-        {
-            "from_me": false,
-            "message": "Olá",
-            "message_type": "conversation",
-            "timestamp": 1783083116
-        },
-        {
-            "from_me": true,
-            "message": "Tudo bem?",
-            "message_type": "conversation",
-            "timestamp": 1783083150
-        }
-    ]
+  "number": "5599999999999",
+  "push_name": "João",
+  "messages": [
+    {
+      "from_me": false,
+      "message": "Olá",
+      "message_type": "conversation",
+      "timestamp": 1783083116
+    },
+    {
+      "from_me": true,
+      "message": "Olá! Como posso ajudar você?",
+      "message_type": "conversation",
+      "timestamp": 1783083150
+    }
+  ]
 }
 ```
 
 ---
 
-## Campos
+## Próximos passos
 
-- `number` → número do contato.
-- `push_name` → nome do contato (quando disponível).
-- `from_me`
-  - `true` → mensagem enviada pela instância.
-  - `false` → mensagem enviada pelo contato.
-- `message` → conteúdo da mensagem.
-- `message_type` → tipo da mensagem (atualmente apenas `conversation`).
-- `timestamp` → horário da mensagem em formato Unix Timestamp.
+- Banco de dados (PostgreSQL)
+- Memória de longo prazo
+- Suporte a múltiplas instâncias
+- Painel administrativo
+- Testes automatizados
 
 ---
 
 ## Autor
 
-**Thayron Higlânder**
+**Thayron Higlânder Santos**
 
 - LinkedIn: https://www.linkedin.com/in/thayron-higlander
