@@ -1,15 +1,15 @@
 from fastapi import APIRouter, Request
 
 from bot.processor import process_message
-from services.openai import openai_service
-from services.evolution import send_message
-from storage.conversations import save_message, get_openai_history
+from services.chatbot import reply
+from services.evolution import evolution_service
 
-router = APIRouter()
+router = APIRouter(prefix="/webhook", tags=["Webhook"])
 
 
-@router.post("/webhook")
+@router.post("/")
 async def webhook(request: Request):
+
     payload = await request.json()
 
     raw_message = payload.get("data") or payload
@@ -19,37 +19,27 @@ async def webhook(request: Request):
 
     message = process_message(raw_message)
 
-    if not message or message["from_me"] or not message["message"]:
+    if not message:
         return {"status": "ignored"}
 
-    number = message["number"]
-    push_name = message["push_name"]
-    user_text = message["message"]
+    if message["from_me"]:
+        return {"status": "ignored"}
 
-    # 1. SALVA MENSAGEM DO USUÁRIO (cria o JSON se não existir), com o timestamp do WhatsApp
-    conversation = save_message(
-        number=number,
-        push_name=push_name,
-        from_me=False,
-        content=user_text,
+    if not message["message"]:
+        return {"status": "ignored"}
+
+    response = reply(
+        number=message["number"],
+        push_name=message["push_name"],
+        message=message["message"],
         timestamp=message["timestamp"],
     )
 
-    # 2. MONTA HISTÓRICO NO FORMATO role/content (a instrução de sistema já vai via `instructions`)
-    messages = get_openai_history(conversation)
-
-    # 3. IA RESPONDE COM MEMÓRIA COMPLETA
-    response = openai_service.generate_response(messages)
-
-    # 4. SALVA RESPOSTA DA IA (timestamp próprio, do momento da resposta)
-    save_message(
-        number=number,
-        push_name=push_name,
-        from_me=True,
-        content=response,
+    evolution_service.send_message(
+        number=message["number"],
+        text=response,
     )
 
-    # 5. ENVIA RESPOSTA
-    send_message(number=number, text=response)
-
-    return {"status": "processed"}
+    return {
+        "status": "processed"
+    }

@@ -17,9 +17,6 @@ if not all([API_KEY_EVO, BASE_URL, INSTANCE]):
 URL_GET_MESSAGES = f"{BASE_URL}/chat/findMessages/{INSTANCE}"
 URL_SEND_MESSAGES = f"{BASE_URL}/message/sendText/{INSTANCE}"
 
-# criando diretorio das conversas
-CONVERSATIONS_DIR = Path("data/conversations")
-CONVERSATIONS_DIR.mkdir(parents=True, exist_ok=True)
 
 HEADERS = {
     "apikey": API_KEY_EVO,

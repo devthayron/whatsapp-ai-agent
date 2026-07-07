@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 
 from storage.database import SessionLocal, Base, engine
 from storage.models import Conversation, Message
-from services.evolution import get_messages_by_number
+from services.evolution import evolution_service
 from bot.processor import process_message
 
 TIMEZONE = ZoneInfo("America/Sao_Paulo")
@@ -45,7 +45,7 @@ def _import_history_from_evolution(session, conversation):
     (conversa recém-criada, sem mensagens ainda).
     """
     try:
-        registros = get_messages_by_number(conversation.number)
+        registros = evolution_service.get_messages_by_number(conversation.number)
     except Exception as e:
         print(f"Falha ao importar histórico da Evolution API pra {conversation.number}: {e}")
         return
