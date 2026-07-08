@@ -19,6 +19,9 @@ async def webhook(request: Request):
 
     message = process_message(raw_message)
 
+    if message is None:
+        return {"status": "ignored"}
+
     if not message:
         return {"status": "ignored"}
 

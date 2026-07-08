@@ -1,5 +1,5 @@
 from services.openai import openai_service
-from storage.conversations import (
+from database.conversations import (
     save_message,
     get_openai_history,
 )

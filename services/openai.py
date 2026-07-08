@@ -3,10 +3,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
 PROMPT = {
     "id": "pmpt_6a4c03086f2081939978a699ca50ad7d0fe8ed8ab07bf32a",
-    "version": "1"
+    "version": "3"
 }
 
 
