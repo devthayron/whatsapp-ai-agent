@@ -1,25 +1,38 @@
 # Chatbot WhatsApp com IA
 
-Chatbot para WhatsApp desenvolvido em Python utilizando **FastAPI**, **Evolution API**, **OpenAI API**, **SQLAlchemy** e **SQLite**.
+Sistema de chatbot integrado ao WhatsApp através da Evolution API, capaz de receber mensagens, identificar usuários, manter o histórico das conversas e gerar respostas automáticas utilizando inteligência artificial com base no contexto da conversa.
 
-A aplicação recebe mensagens através da Evolution API, armazena o histórico das conversas em banco de dados, utiliza esse contexto para gerar respostas com a OpenAI e envia automaticamente a resposta ao usuário pelo WhatsApp.
 ---
 
-## Funcionalidades
+# Funcionalidades
 
-* Integração com Evolution API
-* Webhook para recebimento de mensagens do WhatsApp
-* Processamento e normalização de mensagens recebidas
-* Integração com OpenAI API
-* Armazenamento de usuários e histórico de mensagens em SQLite
-* Recuperação automática de contexto para conversas
-* Geração de respostas utilizando histórico anterior
+* Integração entre WhatsApp, Evolution API, inteligência artificial e banco de dados
+* Recebimento e processamento de mensagens via webhook
+* Identificação de usuários e armazenamento do histórico de conversas
+* Importação automática do histórico existente no primeiro contato
+* Recuperação de contexto para respostas mais precisas
+* Geração de respostas automáticas utilizando OpenAI
+* Controle de mensagens duplicadas
 * Envio automático de respostas pelo WhatsApp
-* Estrutura modular para facilitar manutenção e evolução do projeto
 
 ---
 
-## Fluxo da aplicação
+# Histórico de conversas
+
+Quando um usuário envia uma mensagem:
+
+1. A mensagem chega pelo WhatsApp através da Evolution API e o sistema identifica o contato pelo número.
+2. O sistema verifica se já existe histórico desse usuário armazenado no banco de dados.
+3. Caso o histórico já exista, as mensagens salvas são utilizadas como contexto para a conversa.
+4. Caso não exista histórico, o sistema busca as mensagens antigas desse contato na Evolution API.
+5. As mensagens encontradas são organizadas por data e armazenadas no banco.
+6. Após a primeira importação, o histórico salvo passa a ser reutilizado nas próximas interações.
+
+> A importação acontece apenas no primeiro contato de cada usuário, evitando consultas desnecessárias à Evolution API.
+
+---
+
+# Fluxo da aplicação
 
 ```text
 WhatsApp
@@ -28,66 +41,73 @@ WhatsApp
 Evolution API
     |
     ▼
-Webhook FastAPI
+Webhook
     |
     ▼
-Message Processor
+Processamento da mensagem
     |
     ▼
-Mensagem normalizada
+Identificar usuário
+    |
+    ▼
+Verificar histórico
     |
     +----------------+
     |                |
     ▼                ▼
-SQLite          Histórico
+Existe histórico   Primeiro contato
     |                |
-    +-------+--------+
-            |
-            ▼
-        OpenAI API
-            |
-            ▼
-     Resposta gerada
-            |
-            ▼
-     Salvar resposta
-            |
-            ▼
-     Evolution API
-            |
-            ▼
-        WhatsApp
+    ▼                ▼
+Usa histórico    Importa conversas
+do banco         da Evolution API
+    |                |
+    +--------+-------+
+             |
+             ▼
+        Buscar contexto
+             |
+             ▼
+          OpenAI
+             |
+             ▼
+       Gerar resposta
+             |
+             ▼
+      Salvar resposta
+             |
+             ▼
+Enviar resposta no WhatsApp
 ```
 
 ---
 
-## Estrutura do projeto
+# Estrutura do projeto
 
 ```text
+
 chatbot/
-├── app/
+├── app/                            # aplicação e rotas da API
 │   ├── main.py
-│   ├── routes/
-│   │   ├── webhook.py       
-│   │   └── chat.py          
-│   └── schemas/
-│       └── message.py      
+│   └── routes/
+│       ├── webhook.py
+│       └── chat.py
 │
-├── bot/
-│   └── message_processor.py # processamento e normalização das mensagens
+├── bot/                            # processamento das mensagens
+│   └── message_processor.py
 │
-├── services/
-│   ├── chatbot.py           # fluxo principal da conversa com IA
-│   ├── evolution.py         # integração com Evolution API
-│   └── openai.py            # integração com OpenAI API
+├── services/                       # integrações e regras do sistema
+│   ├── chatbot.py
+│   ├── evolution.py
+│   └── openai.py
 │
-├── database/
-│   ├── connection.py        # conexão SQLAlchemy
-│   ├── models.py            # modelos ORM
-│   └── conversations.py     # operações de persistência
+├── database/                       # modelos e operações do banco de dados
+│   ├── connection.py
+│   ├── models.py
+│   ├── users.py
+│   └── conversations.py
 │
-├── data/
-│   └── conversations.db     # banco SQLite
+├── data/                            # arquivos de dados da aplicação
+│   └── conversations.db
 │
 ├── config.py
 ├── requirements.txt
@@ -96,7 +116,7 @@ chatbot/
 
 ---
 
-## Tecnologias
+# Tecnologias
 
 * Python 3.12
 * FastAPI
@@ -104,66 +124,65 @@ chatbot/
 * Evolution API
 * SQLAlchemy
 * SQLite
-* Uvicorn
-* python-dotenv
 
 ---
 
-## Funcionamento
+# Banco de dados
 
-Quando uma mensagem é recebida:
+SQLite é utilizado inicialmente para armazenar usuários e histórico das conversas.
 
-1. A Evolution API envia o evento para o webhook da aplicação.
-2. O webhook valida o evento recebido para aceitar apenas eventos `messages.upsert`, responsáveis pela criação/recebimento de novas mensagens.
-3. O `message_processor` filtra e transforma a mensagem recebida em um formato normalizado.
-4. A mensagem do usuário é salva no banco.
-5. O histórico da conversa é recuperado.
-6. O histórico é enviado para a OpenAI como contexto.
-7. A resposta gerada pela IA é armazenada.
-8. A resposta é enviada ao usuário através da Evolution API.
+```text
+data/
+└── conversations.db
+```
 
 ---
 
-## Instalação
+# Tabelas
 
-Clone o projeto:
+## Usuários (`users`)
+
+| Campo  | Descrição                |
+| ------ | ------------------------ |
+| id     | Identificador do usuário |
+| name   | Nome do contato          |
+| number | Número do WhatsApp       |
+
+---
+
+## Mensagens (`messages`)
+
+| Campo        | Descrição                       |
+| ------------ | ------------------------------- |
+| id           | Identificador interno           |
+| message_id   | Identificador único da mensagem |
+| user_id      | Usuário relacionado             |
+| role         | Usuário ou assistente           |
+| content      | Texto da mensagem               |
+| message_type | Tipo da mensagem                |
+| sent_at      | Data e hora                     |
+
+---
+
+# Instalação
 
 ```bash
 git clone https://github.com/devthayron/chatbot-evo.git
+
 cd chatbot-evo
-```
 
-Crie o ambiente virtual:
-
-```bash
 python -m venv venv
-```
 
-Ative o ambiente:
-
-Linux:
-
-```bash
 source venv/bin/activate
-```
 
-Windows:
-
-```powershell
-venv\Scripts\activate
-```
-
-Instale as dependências:
-
-```bash
 pip install -r requirements.txt
 ```
 
 ---
 
-## Configuração
+# Configuração
 
-Crie um arquivo `.env` na raiz do projeto:
+Criar `.env`:
 
 ```env
 OPENAI_API_KEY=
@@ -175,101 +194,42 @@ API_KEY_EVO=
 
 Variáveis:
 
-| Variável         | Descrição                              |
-| ---------------- | -------------------------------------- |
-| `OPENAI_API_KEY` | Chave da OpenAI API                    |
-| `BASE_URL`       | URL da Evolution API                   |
-| `INSTANCE`       | Nome da instância do WhatsApp          |
-| `API_KEY_EVO`    | Chave de autenticação da Evolution API |
+| Variável       | Descrição                 |
+| -------------- | ------------------------- |
+| OPENAI_API_KEY | Chave da OpenAI           |
+| BASE_URL       | Endereço da Evolution API |
+| INSTANCE       | Instância do WhatsApp     |
+| API_KEY_EVO    | Chave da Evolution API    |
 
 ---
 
-## Executando
-
-Inicie a aplicação:
+# Executando
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-A API ficará disponível em:
+Swagger:
 
-```text
-http://localhost:8000
 ```
-
-Documentação automática:
-
-```text
 http://localhost:8000/docs
 ```
 
 ---
 
-# Banco de dados
+# Próximos passos:
 
-O sistema utiliza SQLite para persistência inicial.
-
-Banco:
-
-```text
-data/
-└── conversations.db
-```
-
-## Modelo de dados
-
-### Tabela `users`
-
-| Campo  | Tipo    | Descrição           |
-| ------ | ------- | ------------------- |
-| id     | INTEGER | Identificador único |
-| name   | TEXT    | Nome do contato     |
-| number | TEXT    | Número do WhatsApp  |
-
----
-
-### Tabela `conversations`
-
-| Campo        | Tipo     | Descrição                                               |
-| ------------ | -------- | ------------------------------------------------------- |
-| id           | INTEGER  | Identificador único da mensagem                         |
-| user_id      | INTEGER  | Referência ao usuário                                   |
-| role         | TEXT     | Origem da mensagem (`user` ou `assistant`)              |
-| content      | TEXT     | Conteúdo da mensagem                                    |
-| message_type | TEXT     | Tipo da mensagem (`conversation`, `imageMessage`, etc.) |
-| timestamp    | DATETIME | Data e hora da mensagem                                 |
-
----
-
-## Relacionamento
-
-| Origem     | Destino                | Cardinalidade |
-| ---------- | ---------------------- | ------------- |
-| `users.id` | `conversation.user_id` | 1:N           |
-
-Um usuário pode possuir várias mensagens no histórico.
-
-Esse histórico é utilizado como contexto antes da geração de uma nova resposta pela IA.
-> Somente as ultimas 30 mensagens como padrão 
-
----
-
-## Próximos passos
-
-* Suporte a múltiplas instâncias do WhatsApp
 * Migração para PostgreSQL
-* Memória de longo prazo
-* Sistema RAG com documentos
-* Painel administrativo
+* Dockerização da aplicação
 * Testes automatizados
-* Logging estruturado para auditoria
-
+* Sistema de logs
+* RAG com documentos
+* Dashboard administrativo
 ---
 
-## Autor
+# Autor
 
 **Thayron Higlânder Santos**
 
 LinkedIn:
-https://www.linkedin.com/in/thayron-higlander
+[https://www.linkedin.com/in/thayron-higlander](https://www.linkedin.com/in/thayron-higlander)

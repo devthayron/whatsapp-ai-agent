@@ -7,24 +7,49 @@ from config import (
 
 class EvolutionService:
 
-    def get_messages(self, payload=None):
+    def get_messages(self, page=1):
+
+        payload = {
+            "page": page,
+        }
 
         response = SESSION.post(
             URL_GET_MESSAGES,
-            json=payload or {},
+            json=payload,
         )
 
         response.raise_for_status()
 
-        data = response.json()
+        return response.json()["messages"]
 
-        return data["messages"]["records"]
+
+    def get_all_messages(self):
+
+        records = []
+
+        page = 1
+
+        while True:
+
+            data = self.get_messages(page)
+
+            records.extend(
+                data["records"]
+            )
+
+            if page >= data["pages"]:
+                break
+
+            page += 1
+
+        return records
+
 
     def get_messages_by_number(self, number: str):
 
         target = f"{number}@s.whatsapp.net"
 
-        records = self.get_messages()
+        records = self.get_all_messages()
 
         return [
             record
@@ -34,6 +59,7 @@ class EvolutionService:
                 or record.get("key", {}).get("remoteJidAlt") == target
             )
         ]
+
 
     def send_message(
         self,

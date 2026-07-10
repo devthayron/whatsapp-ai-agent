@@ -1,43 +1,30 @@
 from services.openai import openai_service
 from database.conversations import (
+    ensure_history,
     save_message,
     get_openai_history,
 )
+from database.users import get_or_create_user
 
 
-def process_conversation(
-    *,
-    number: str,
-    push_name: str | None,
-    message: str,
-    timestamp: int | None = None,
-    message_type: str,
-) -> str:
-    """
-    Processa uma conversa com a IA.
+def process_conversation(msg):
 
-    - Salva a mensagem recebida.
-    - Monta o histórico.
-    - Gera a resposta da IA.
-    - Salva a resposta.
-    """
-
-    user = save_message(
-        number=number,
-        push_name=push_name,
-        from_me=False,
-        content=message,
-        timestamp=timestamp,
-        message_type=message_type
+    user_id = get_or_create_user(
+        number=msg['number'],
+        name=msg['push_name'],
     )
 
-    history = get_openai_history(user)
+    ensure_history(user_id)
+
+    save_message(**msg)
+
+    history = get_openai_history(user_id)
 
     response = openai_service.generate_response(history)
 
     save_message(
-        number=number,
-        push_name=push_name,
+        number=msg['number'],
+        push_name=msg['push_name'],
         from_me=True,
         content=response,
     )

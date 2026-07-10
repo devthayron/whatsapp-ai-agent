@@ -4,7 +4,6 @@ from sqlalchemy import (
     String,
     DateTime,
     ForeignKey,
-    UniqueConstraint,
 )
 
 from sqlalchemy.orm import relationship
@@ -18,32 +17,22 @@ class User(Base):
     name = Column(String, nullable=True)
     number = Column(String, unique=True, nullable=False, index=True)
 
-    conversations = relationship(
-        "Conversation",
+    messages = relationship(
+        "Message",
         back_populates="user",
         cascade="all, delete-orphan",
-        order_by="Conversation.timestamp",
+        order_by="Message.sent_at",
     )
 
 
-class Conversation(Base):
-    __tablename__ = "conversations"
+class Message(Base):
+    __tablename__ = "messages"
 
-    __table_args__ = (                                                                                                                                                                                                                                                                                                                      
-        UniqueConstraint(
-            "user_id",
-            "role",
-            "content",                                                                                                                                                                                                                                                                                                                      
-            "timestamp",                                                                                                                                                                                                                                                                                                                        
-            name="                                                                                                                                                                                                                                                                                                                                                                                                                   ",
-        ),                                                                                                                                                                                       
-    )                                                   
-
-
-    id = Column(Integer,primary_key=True)
+    id = Column(Integer, primary_key=True)
+    message_id = Column(String,unique=True,nullable=False,index=True)                                         
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     role = Column(String, nullable=False)
     content = Column(String, nullable=False)
     message_type = Column(String, nullable=False)
-    timestamp = Column(DateTime, nullable=False, index=True)
-    user = relationship("User",back_populates="conversations")
+    sent_at = Column(DateTime, nullable=False, index=True)
+    user = relationship("User", back_populates="messages")

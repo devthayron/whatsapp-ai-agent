@@ -11,27 +11,21 @@ router = APIRouter(prefix="/webhook", tags=["Webhook"])
 async def webhook(request: Request):
 
     payload = await request.json()
-    print(payload)
+    # print(payload)
     raw_message = extract_webhook_message(payload)
 
     if not raw_message:
         return {"status": "ignored"}
     
-    message = normalize_message(raw_message)
+    msg = normalize_message(raw_message)
 
-    if not message:
+    if not msg:
         return {"status": "ignored"}
 
-    response = process_conversation(
-        number=message["number"],
-        push_name=message["push_name"],
-        message=message["message"],
-        timestamp=message["timestamp"],
-        message_type=message['message_type']
-    )
+    response = process_conversation(msg)
 
     evolution_service.send_message(
-        number=message["number"],
+        number=msg["number"],
         text=response,
     )
 
