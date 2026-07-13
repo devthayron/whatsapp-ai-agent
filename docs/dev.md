@@ -1,14 +1,14 @@
 # Ambiente de desenvolvimento
 
-Durante o desenvolvimento, a aplicação FastAPI roda localmente e o webhook é disponibilizado publicamente utilizando o ngrok.
+A aplicação FastAPI é executada localmente e o webhook é exposto à internet utilizando o ngrok, permitindo que a Evolution API envie eventos para a aplicação.
 
 A Evolution API pode ser executada em diferentes ambientes:
 
 - **VPS:** mais próximo de um ambiente de produção.
-- **Máquina local:** utilizado para testes e desenvolvimento.
-- **Outros ambientes de hospedagem:** conforme a necessidade do projeto.
+- **Máquina local:** ideal para testes.
+- **Outros serviços de hospedagem:** conforme a necessidade do projeto.
 
-Neste projeto, a Evolution API está **hospedada em uma VPS**, enquanto o FastAPI é executado localmente durante o desenvolvimento.
+Neste projeto, a Evolution API está hospedada em uma **VPS**, enquanto a aplicação FastAPI é executada localmente.
 
 ---
 
@@ -16,19 +16,19 @@ Neste projeto, a Evolution API está **hospedada em uma VPS**, enquanto o FastAP
 
 ```text
 WhatsApp
-    |
+    │
     ▼
 Evolution API (VPS)
-    |
+    │
     ▼
 ngrok (URL pública)
-    |
+    │
     ▼
 FastAPI (computador local)
-    |
+    │
     ▼
-SQLite local
-````
+SQLite
+```
 
 ---
 
@@ -40,33 +40,39 @@ SQLite local
 uvicorn app.main:app --reload
 ```
 
-## Terminal 2 — criar túnel público com ngrok
+A documentação interativa da API estará disponível em:
+
+```text
+http://localhost:8000/docs
+```
+
+## Terminal 2 — criar um túnel público com o ngrok
 
 ```bash
 ngrok http 8000
 ```
 
-O ngrok irá gerar uma URL pública:
+O ngrok irá gerar uma URL pública semelhante a:
 
 ```text
 https://xxxx.ngrok-free.app
 ```
 
-Essa URL deve ser configurada como webhook na Evolution API:
+Configure essa URL como webhook na Evolution API:
 
 ```text
 https://xxxx.ngrok-free.app/webhook/
 ```
 
-> Durante o desenvolvimento, a URL do ngrok pode mudar a cada execução dependendo da configuração utilizada.
+> Dependendo da configuração utilizada, o ngrok pode gerar uma nova URL a cada execução.
 
 ---
 
 # Banco de dados
 
-Durante o desenvolvimento, o projeto utiliza SQLite por ser simples e não exigir configuração adicional.
+O projeto utiliza SQLite durante o desenvolvimento por ser simples de configurar e não exigir um servidor dedicado.
 
-O banco fica armazenado localmente:
+O banco é armazenado localmente em:
 
 ```text
 data/
@@ -77,39 +83,35 @@ data/
 
 # Ambiente de produção
 
-Em produção, o recomendado é executar a aplicação em uma infraestrutura própria, removendo a necessidade do ngrok.
-
-A Evolution API, o FastAPI e o banco de dados podem ser hospedados em uma VPS.
+Em produção, a aplicação pode ser executada em uma VPS ou outro serviço de hospedagem, eliminando a necessidade do ngrok.
 
 Fluxo:
 
 ```text
 WhatsApp
-    |
+    │
     ▼
 Evolution API (VPS)
-    |
+    │
     ▼
 FastAPI (VPS)
-    |
+    │
     ▼
 PostgreSQL
 ```
 
-O PostgreSQL é recomendado para produção devido a:
+O PostgreSQL é recomendado para produção por oferecer:
 
-* Maior capacidade de armazenamento.
-* Melhor desempenho com maior volume de mensagens.
-* Maior segurança e controle dos dados.
-* Facilidade para backups e manutenção.
+- Melhor desempenho com grandes volumes de dados.
+- Maior escalabilidade.
+- Recursos avançados de segurança.
+- Facilidade para backups e manutenção.
 
 ---
 
 # Observação
 
-O ngrok é utilizado apenas durante o desenvolvimento, pois cria um acesso público temporário para uma aplicação que está rodando localmente.
-
-Em ambientes de produção, o recomendado é utilizar uma hospedagem própria com domínio, HTTPS e um banco de dados adequado.
+O ngrok é utilizado apenas para expor temporariamente uma aplicação executada localmente. Em produção, o recomendado é utilizar um domínio próprio com HTTPS e hospedar todos os serviços em uma infraestrutura dedicada.
 
 ---
 
@@ -119,25 +121,25 @@ Em ambientes de produção, o recomendado é utilizar uma hospedagem própria co
 
 ```text
 Evolution API (VPS ou local)
-        |
+        │
         ▼
-ngrok
-        |
+      ngrok
+        │
         ▼
-FastAPI local
-        |
+ FastAPI (local)
+        │
         ▼
-SQLite
+      SQLite
 ```
 
 ## Produção
 
 ```text
-Evolution API (VPS)
-        |
+Evolution API
+        │
         ▼
-FastAPI (VPS)
-        |
+     FastAPI
+        │
         ▼
-PostgreSQL
+   PostgreSQL
 ```

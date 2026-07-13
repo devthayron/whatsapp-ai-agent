@@ -8,7 +8,9 @@ from database.users import get_or_create_user
 
 
 def process_conversation(msg):
-
+    """
+    Recebe uma mensagem do usuário e retorna a resposta da IA.
+    """
     user_id = get_or_create_user(
         number=msg['number'],
         name=msg['push_name'],

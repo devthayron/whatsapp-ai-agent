@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from app.schemas.message import ChatRequest
-from services.chatbot import process_conversation
+from services.agent import process_conversation
 from services.evolution import evolution_service
 
 router = APIRouter(

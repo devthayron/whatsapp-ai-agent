@@ -24,6 +24,7 @@ class EvolutionService:
 
 
     def get_all_messages(self):
+        """Busca todas as mensagens percorrendo as páginas da API."""
 
         records = []
 
@@ -46,19 +47,59 @@ class EvolutionService:
 
 
     def get_messages_by_number(self, number: str):
+        """
+        Busca mensagens de um contato diretamente pela API.
 
-        target = f"{number}@s.whatsapp.net"
+        Pesquisa usando remoteJid e remoteJidAlt.
+        """
 
-        records = self.get_all_messages()
+        jid = f"{number}@s.whatsapp.net"
 
-        return [
-            record
-            for record in records
-            if (
-                record.get("key", {}).get("remoteJid") == target
-                or record.get("key", {}).get("remoteJidAlt") == target
-            )
-        ]
+        messages = []
+
+        for field in [
+            "remoteJid",
+            "remoteJidAlt",
+        ]:
+
+            page = 1
+
+            while True:
+
+                payload = {
+                    "where": {
+                        "key": {
+                            field: jid
+                        }
+                    },
+                    "page": page,
+                }
+
+                response = SESSION.post(
+                    URL_GET_MESSAGES,
+                    json=payload,
+                )
+
+                response.raise_for_status()
+
+                data = response.json()["messages"]
+
+                messages.extend(
+                    data["records"]
+                )
+
+                if page >= data["pages"]:
+                    break
+
+                page += 1
+
+
+        unique = {
+            msg["id"]: msg
+            for msg in messages
+        }
+
+        return list(unique.values())
 
 
     def send_message(

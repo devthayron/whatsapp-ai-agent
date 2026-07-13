@@ -12,7 +12,7 @@ from services.evolution import evolution_service
 
 
 TIMEZONE = ZoneInfo("America/Sao_Paulo")
-MAX_HISTORY = 30
+CONTEXT_MESSAGES_LIMIT = 30
 
 
 def add_message(
@@ -24,6 +24,7 @@ def add_message(
     message_type,
     sent_at,
 ):
+
     exists = (
         session.query(Message)
         .filter_by(message_id=message_id)
@@ -56,8 +57,39 @@ def timestamp_to_datetime(timestamp):
     return timestamp
 
 
-def import_history_from_evolution(user_id):
+def _get_history(number):
 
+    """Obtém, normaliza e ordena cronologicamente o histórico de mensagens da Evolution API."""
+
+    try:
+        records = evolution_service.get_messages_by_number(number)
+
+    except Exception as e:
+        print(f"Erro Evolution {number}: {e}")
+        return None
+
+    messages = []
+
+    for record in records:
+
+        msg = normalize_message(record)
+
+        if msg:
+            messages.append(msg)
+
+    messages.sort(
+        key=lambda x: x["timestamp"]
+    )
+
+    return messages
+
+
+def import_history_from_evolution(user_id):
+    """
+    Importa o histórico de conversas da Evolution API para o banco de dados.
+
+    Executada apenas na primeira sincronização do usuário.
+    """
     with SessionLocal() as session:
 
         user = (
@@ -66,31 +98,10 @@ def import_history_from_evolution(user_id):
             .one()
         )
 
-        try:
-            records = evolution_service.get_messages_by_number(
-                user.number
-            )
+        messages = _get_history(user.number)
 
-        except Exception as e:
-            print(f"Erro Evolution {user.number}: {e}")
+        if messages is None:
             return
-
-
-        messages = []
-
-        for record in records:
-
-            msg = normalize_message(record)
-
-            if msg:
-                messages.append(msg)
-
-
-        # garante ordem cronológica
-        messages.sort(
-            key=lambda x: x["timestamp"]
-        )
-
 
         for msg in messages:
 
@@ -108,6 +119,8 @@ def import_history_from_evolution(user_id):
                     msg["timestamp"]
                 ),
             )
+        
+        user.history_imported = True
 
         try:
             session.commit()
@@ -118,19 +131,22 @@ def import_history_from_evolution(user_id):
 
 
 def ensure_history(user_id):
-    
+    """
+    Garante que o histórico do usuário exista no banco de dados.
+
+    Caso ainda não tenha sido importado, realiza a sincronização inicial.
+    """
+
     with SessionLocal() as session:
 
-        exists = (
-            session.query(Message.id)
-            .filter(
-                Message.user_id == user_id
-            )
-            .first()
+        user = (
+            session.query(User)
+            .filter_by(id=user_id)
+            .one()
         )
 
-    if exists is None:
-        import_history_from_evolution(user_id)
+        if not user.history_imported:
+            import_history_from_evolution(user.id)
 
 
 def save_message(
@@ -180,8 +196,12 @@ def save_message(
 
 def get_openai_history(
     user_id,
-    limit=MAX_HISTORY,
+    limit=CONTEXT_MESSAGES_LIMIT,
 ):
+    """
+    Retorna as últimas mensagens no formato esperado pela OpenAI,
+    preservando a ordem cronológica da conversa.
+    """
 
     with SessionLocal() as session:
 
