@@ -15,6 +15,7 @@ Sistema de agente de IA integrado ao WhatsApp por meio da Evolution API, capaz d
 * Geração de respostas contextualizadas utilizando modelos da OpenAI
 * Controle de mensagens duplicadas
 * Envio automático das respostas pelo WhatsApp
+* Sistema de logs estruturado (console e arquivo)
 
 ---
 
@@ -113,6 +114,10 @@ whatsapp-ai-agent/
 ├── data/                               # arquivos de dados da aplicação
 │   └── conversations.db
 │
+├── logs/                               # arquivos de log da aplicação
+│   └── app.log
+│
+├── logging_config.py                   # configuração do sistema de logs
 ├── config.py
 ├── requirements.txt
 └── README.md
@@ -168,6 +173,12 @@ data/
 
 ---
 
+# Logging
+
+Logs são registrados no console e em `logs/app.log`, com nível controlado pela variável `LOG_LEVEL` (padrão: `INFO`). Por privacidade, o conteúdo das mensagens nunca é registrado.
+
+---
+
 # Instalação
 
 ```bash
@@ -195,16 +206,18 @@ OPENAI_API_KEY=sua_chave
 BASE_URL=http://seu-servidor-evolution:8080
 INSTANCE=nome_da_instancia
 API_KEY_EVO=sua_api_key
+LOG_LEVEL=INFO
 ```
 
 ## Variáveis de ambiente
 
-| Variável      | Descrição                              |
-| -------------- | ---------------------------------------- |
-| OPENAI_API_KEY | Chave da OpenAI                          |
-| BASE_URL       | Endereço da Evolution API               |
-| INSTANCE       | Nome da instância do WhatsApp           |
-| API_KEY_EVO    | Chave de autenticação da Evolution API |
+| Variável       | Descrição                                                |
+| -------------- | -------------------------------------------------------- |
+| OPENAI_API_KEY | Chave da OpenAI                                          |
+| BASE_URL       | Endereço da Evolution API                                |
+| INSTANCE       | Nome da instância do WhatsApp                            |
+| API_KEY_EVO    | Chave de autenticação da Evolution API                   |
+| LOG_LEVEL      | Nível de log (`INFO`, `DEBUG`...)                        |
 
 ---
 
@@ -220,7 +233,6 @@ As instruções para executar a aplicação e a configuração do ambiente de de
 # Próximos passos
 
 * Testes automatizados
-* Sistema de logs
 * Dockerização da aplicação
 * Migração para PostgreSQL
 * Dashboard administrativo
@@ -232,4 +244,4 @@ As instruções para executar a aplicação e a configuração do ambiente de de
 
 # Autor
 
-- **Thayron Higlânder** – [LinkedIn](https://www.linkedin.com/in/thayron-higlander) 
+- **Thayron Higlânder** – [LinkedIn](https://www.linkedin.com/in/thayron-higlander)

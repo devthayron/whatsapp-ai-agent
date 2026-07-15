@@ -1,9 +1,12 @@
+import logging
+
 from config import (
     SESSION,
     URL_GET_MESSAGES,
     URL_SEND_MESSAGES,
 )
 
+logger = logging.getLogger(__name__)
 
 class EvolutionService:
 
@@ -13,12 +16,21 @@ class EvolutionService:
             "page": page,
         }
 
-        response = SESSION.post(
-            URL_GET_MESSAGES,
-            json=payload,
-        )
+        try:
+            response = SESSION.post(
+                URL_GET_MESSAGES,
+                json=payload,
+            )
 
-        response.raise_for_status()
+            response.raise_for_status()
+
+        except Exception:
+            logger.exception(
+                "Erro ao buscar mensagens na Evolution API | url=%s | page=%s",
+                URL_GET_MESSAGES,
+                page,
+            )
+            raise
 
         return response.json()["messages"]
 
@@ -75,12 +87,21 @@ class EvolutionService:
                     "page": page,
                 }
 
-                response = SESSION.post(
-                    URL_GET_MESSAGES,
-                    json=payload,
-                )
+                try:
+                    response = SESSION.post(
+                        URL_GET_MESSAGES,
+                        json=payload,
+                    )
 
-                response.raise_for_status()
+                    response.raise_for_status()
+                except Exception:
+                    logger.exception(
+                        "Erro ao buscar mensagens por número | number=%s | campo=%s | page=%s",
+                        number,
+                        field,
+                        page,
+                    )
+                    raise
 
                 data = response.json()["messages"]
 
@@ -99,6 +120,12 @@ class EvolutionService:
             for msg in messages
         }
 
+        logger.debug(
+            "Mensagens únicas encontradas para o número | number=%s | total=%s",
+            number,
+            len(unique),
+        )
+
         return list(unique.values())
 
 
@@ -113,13 +140,27 @@ class EvolutionService:
             "text": text,
         }
 
-        response = SESSION.post(
-            URL_SEND_MESSAGES,
-            json=payload,
+        try:
+            response = SESSION.post(
+                URL_SEND_MESSAGES,
+                json=payload,
+            )
+
+            response.raise_for_status()
+        except Exception:
+            logger.exception(
+                "Erro ao enviar mensagem via Evolution API | number=%s | url=%s",
+                number,
+                URL_SEND_MESSAGES,
+            )
+            raise
+
+        logger.info(
+            "Mensagem enviada com sucesso | number=%s",
+            number,
         )
 
-        response.raise_for_status()
-
+        
         return response.json()
 
 

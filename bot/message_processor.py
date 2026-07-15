@@ -1,13 +1,19 @@
+import logging
+
+logger = logging.getLogger(__name__)
+
 def extract_webhook_message(payload):
 
     event = payload.get("event")
     # Processa apenas novas mensagens recebidas
     if event != "messages.upsert":
+        logger.debug("Evento de webhook ignorado | event=%s", event)
         return None
 
     raw_message = payload.get("data")
 
     if not raw_message:
+        logger.debug("Payload sem campo 'data', ignorado")
         return None
     
     key = raw_message.get("key", {})
@@ -15,10 +21,12 @@ def extract_webhook_message(payload):
 
     # Ignora mensagens enviadas pelo próprio bot
     if key.get("fromMe"):
+        logger.debug("Mensagem ignorada (enviada pelo próprio bot) | remote_jid=%s", remote_jid)
         return None
     
     # Responde apenas mensagens no contato privado
     if not remote_jid.endswith("@s.whatsapp.net"):
+        logger.debug("Mensagem ignorada | motivo=chat não individual | remote_jid=%s", remote_jid)
         return None
 
     return raw_message
@@ -47,6 +55,7 @@ def handle_message_type(raw_message):
     if handle:
         return message_type, handle(raw_message)
 
+    logger.warning("Tipo de mensagem não tratado | message_type=%s", message_type)
     return message_type, f"[Mensagem do tipo: {message_type}]"
 
 def normalize_phone(number: str | None) -> str | None:
@@ -73,6 +82,7 @@ def normalize_message(raw_message):
     number = normalize_phone(remote_jid_alt or remote_jid)
 
     if not number:
+        logger.warning("Mensagem sem número identificável, ignorada | message_id=%s", message_id)
         return None
 
     return {

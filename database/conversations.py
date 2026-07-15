@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from uuid import uuid4
 from zoneinfo import ZoneInfo
@@ -9,6 +10,8 @@ from database.models import Message, User
 from database.users import _get_or_create_user
 from bot.message_processor import normalize_message
 from services.evolution import evolution_service
+
+logger = logging.getLogger(__name__)
 
 
 TIMEZONE = ZoneInfo("America/Sao_Paulo")
@@ -32,6 +35,7 @@ def add_message(
     )
 
     if exists:
+        logger.debug("Mensagem duplicada ignorada | message_id=%s", message_id)
         return
 
     session.add(
@@ -64,8 +68,8 @@ def _get_history(number):
     try:
         records = evolution_service.get_messages_by_number(number)
 
-    except Exception as e:
-        print(f"Erro Evolution {number}: {e}")
+    except Exception:
+        logger.exception("Erro ao buscar histórico na Evolution API | number=%s", number)
         return None
 
     messages = []
@@ -97,10 +101,12 @@ def import_history_from_evolution(user_id):
             .filter_by(id=user_id)
             .one()
         )
+        logger.info("Iniciando importação de histórico | number=%s", user.number)
 
         messages = _get_history(user.number)
 
         if messages is None:
+            logger.warning("Importação abortada (falha na Evolution API) | number=%s", user.number)
             return
 
         for msg in messages:
@@ -124,10 +130,15 @@ def import_history_from_evolution(user_id):
 
         try:
             session.commit()
+            logger.info(
+                "Histórico importado com sucesso | number=%s | total_messages=%s",
+                user.number,
+                len(messages),
+            )
 
-        except IntegrityError as e:
+        except IntegrityError:
             session.rollback()
-            print(e)
+            logger.exception("Erro ao importar histórico | number=%s", user.number)
 
 
 def ensure_history(user_id):
@@ -148,6 +159,9 @@ def ensure_history(user_id):
         if not user.history_imported:
             import_history_from_evolution(user.id)
 
+        else:
+            logger.debug("Histórico já sincronizado | number=%s", user.number)
+
 
 def save_message(
     number,
@@ -166,6 +180,7 @@ def save_message(
 
     sent_at = timestamp_to_datetime(timestamp)
 
+    role = "assistant" if from_me else "user"
 
     with SessionLocal() as session:
 
@@ -173,13 +188,13 @@ def save_message(
             session,
             number,
             push_name,
-        )
+        )  
 
         add_message(
             session=session,
             user=user,
             message_id=message_id,
-            role="assistant" if from_me else "user",
+            role=role,
             content=content,
             message_type=message_type,
             sent_at=sent_at,
@@ -188,10 +203,11 @@ def save_message(
 
         try:
             session.commit()
+            logger.debug("Mensagem salva | role=%s | number=%s | message_id=%s", role, number, message_id,)
 
-        except IntegrityError as e:
+        except IntegrityError:
             session.rollback()
-            print(e)
+            logger.exception("Erro ao salvar mensagem | role=%s | number=%s | message_id=%s", role, number, message_id,)
 
 
 def get_openai_history(
@@ -217,17 +233,15 @@ def get_openai_history(
             .limit(limit)
             .all()
         )
-
         messages.reverse()
-
-
+        logger.debug("Histórico recuperado | total_messages=%s", len(messages))
         return [
             {
                 "role": msg.role,
                 "content": (
                     f"[{msg.sent_at:%d/%m/%Y %H:%M}] "
                     f"{msg.content}"
-                ),
+                )
             }
             for msg in messages
         ]

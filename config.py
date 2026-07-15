@@ -7,7 +7,7 @@ load_dotenv()
 API_KEY_EVO = os.getenv("API_KEY_EVO")
 BASE_URL = os.getenv("BASE_URL")
 INSTANCE = os.getenv("INSTANCE")
-
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
 if not all([API_KEY_EVO, BASE_URL, INSTANCE]):
     raise RuntimeError("Variáveis de ambiente faltando. Verifique API_KEY_EVO, BASE_URL e INSTANCE no .env")
