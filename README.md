@@ -92,13 +92,13 @@ Enviar resposta no WhatsApp
 
 ```text
 whatsapp-ai-agent/
-├── app/
+├── app/								# aplicação e rotas da API
 │   ├── main.py
 │   └── routes/
 │       ├── webhook.py
 │       └── chat.py
 │
-├── bot/                                # aplicação e rotas da API
+├── bot/                                # processamento de conversa
 │   └── message_processor.py
 │
 ├── services/                           # integrações e regras do sistema
@@ -118,7 +118,7 @@ whatsapp-ai-agent/
 ├── logs/                               # arquivos de log da aplicação
 │   └── app.log
 │
-├── logging_config.py                   # configuração do sistema de logs
+├── logger.py                   		# configuração do sistema de logs
 ├── config.py
 ├── requirements.txt
 └── README.md
@@ -212,13 +212,13 @@ LOG_LEVEL=INFO
 
 ## Variáveis de ambiente
 
-| Variável       | Descrição                                                |
-| -------------- | -------------------------------------------------------- |
-| OPENAI_API_KEY | Chave da OpenAI                                          |
-| BASE_URL       | Endereço da Evolution API                                |
-| INSTANCE       | Nome da instância do WhatsApp                            |
-| API_KEY_EVO    | Chave de autenticação da Evolution API                   |
-| LOG_LEVEL      | Nível de log (`INFO`, `DEBUG`...)                        |
+| Variável      | Descrição                              |
+| -------------- | ---------------------------------------- |
+| OPENAI_API_KEY | Chave da OpenAI                          |
+| BASE_URL       | Endereço da Evolution API               |
+| INSTANCE       | Nome da instância do WhatsApp           |
+| API_KEY_EVO    | Chave de autenticação da Evolution API |
+| LOG_LEVEL      | Nível de log (`INFO`, `DEBUG`...)   |
 
 ---
 
@@ -227,7 +227,6 @@ LOG_LEVEL=INFO
 As instruções para executar a aplicação e a configuração do ambiente de desenvolvimento estão disponíveis na:
 
 [Documentação de desenvolvimento](docs/dev.md)
-
 
 ---
 

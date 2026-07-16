@@ -4,3 +4,4 @@ __pycache__/
 data/
 teste.py
 logs/
+.pytest_cache
