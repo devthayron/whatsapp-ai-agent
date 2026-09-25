@@ -4,6 +4,12 @@ Sistema de agente de IA integrado ao WhatsApp por meio da Evolution API, capaz d
 
 ---
 
+# Visão geral do projeto
+
+[![Watch a one-minute video tour of whatsapp-ai-agent](https://gitdiagram.com/video-badge.svg)](https://gitdiagram.com/devthayron/whatsapp-ai-agent/video)
+
+---
+
 # Funcionalidades
 
 * Integração entre WhatsApp, Evolution API, OpenAI e banco de dados

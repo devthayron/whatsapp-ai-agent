@@ -6,3 +6,4 @@ teste.py
 logs/
 .pytest_cache
 password.txt
+assets/
