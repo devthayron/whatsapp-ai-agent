@@ -5,10 +5,10 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.exc import IntegrityError
 
+from bot.message_processor import normalize_message
 from database.connection import SessionLocal
 from database.models import Message, User
 from database.users import _get_or_create_user
-from bot.message_processor import normalize_message
 from services.evolution import evolution_service
 
 logger = logging.getLogger(__name__)
@@ -18,21 +18,9 @@ TIMEZONE = ZoneInfo("America/Sao_Paulo")
 CONTEXT_MESSAGES_LIMIT = 30
 
 
-def add_message(
-    session,
-    user,
-    message_id,
-    role,
-    content,
-    message_type,
-    sent_at,
-):
+def add_message(session, user, message_id, role, content, message_type, sent_at):
 
-    exists = (
-        session.query(Message)
-        .filter_by(message_id=message_id)
-        .first()
-    )
+    exists = session.query(Message).filter_by(message_id=message_id).first()
 
     if exists:
         logger.debug("Mensagem duplicada ignorada | message_id=%s", message_id)
@@ -62,28 +50,26 @@ def timestamp_to_datetime(timestamp):
 
 
 def _get_history(number):
-
     """Obtém, normaliza e ordena cronologicamente o histórico de mensagens da Evolution API."""
 
     try:
         records = evolution_service.get_messages_by_number(number)
 
     except Exception:
-        logger.exception("Erro ao buscar histórico na Evolution API | number=%s", number)
+        logger.exception(
+            "Erro ao buscar histórico na Evolution API | number=%s", number
+        )
         return None
 
     messages = []
 
     for record in records:
-
         msg = normalize_message(record)
 
         if msg:
             messages.append(msg)
 
-    messages.sort(
-        key=lambda x: x["timestamp"]
-    )
+    messages.sort(key=lambda x: x["timestamp"])
 
     return messages
 
@@ -95,37 +81,28 @@ def import_history_from_evolution(user_id):
     Executada apenas na primeira sincronização do usuário.
     """
     with SessionLocal() as session:
-
-        user = (
-            session.query(User)
-            .filter_by(id=user_id)
-            .one()
-        )
+        user = session.query(User).filter_by(id=user_id).one()
         logger.info("Iniciando importação de histórico | number=%s", user.number)
 
         messages = _get_history(user.number)
 
         if messages is None:
-            logger.warning("Importação abortada (falha na Evolution API) | number=%s", user.number)
+            logger.warning(
+                "Importação abortada (falha na Evolution API) | number=%s", user.number
+            )
             return
 
         for msg in messages:
-
             add_message(
                 session=session,
                 user=user,
                 message_id=msg["message_id"],
                 role="assistant" if msg["from_me"] else "user",
                 content=msg["content"],
-                message_type=msg.get(
-                    "message_type",
-                    "conversation",
-                ),
-                sent_at=timestamp_to_datetime(
-                    msg["timestamp"]
-                ),
+                message_type=msg.get("message_type", "conversation"),
+                sent_at=timestamp_to_datetime(msg["timestamp"]),
             )
-        
+
         user.history_imported = True
 
         try:
@@ -149,12 +126,7 @@ def ensure_history(user_id):
     """
 
     with SessionLocal() as session:
-
-        user = (
-            session.query(User)
-            .filter_by(id=user_id)
-            .one()
-        )
+        user = session.query(User).filter_by(id=user_id).one()
 
         if not user.history_imported:
             import_history_from_evolution(user.id)
@@ -183,12 +155,11 @@ def save_message(
     role = "assistant" if from_me else "user"
 
     with SessionLocal() as session:
-
         user = _get_or_create_user(
             session,
             number,
             push_name,
-        )  
+        )
 
         add_message(
             session=session,
@@ -200,14 +171,23 @@ def save_message(
             sent_at=sent_at,
         )
 
-
         try:
             session.commit()
-            logger.debug("Mensagem salva | role=%s | number=%s | message_id=%s", role, number, message_id,)
+            logger.debug(
+                "Mensagem salva | role=%s | number=%s | message_id=%s",
+                role,
+                number,
+                message_id,
+            )
 
         except IntegrityError:
             session.rollback()
-            logger.exception("Erro ao salvar mensagem | role=%s | number=%s | message_id=%s", role, number, message_id,)
+            logger.exception(
+                "Erro ao salvar mensagem | role=%s | number=%s | message_id=%s",
+                role,
+                number,
+                message_id,
+            )
 
 
 def get_openai_history(
@@ -220,12 +200,9 @@ def get_openai_history(
     """
 
     with SessionLocal() as session:
-
         messages = (
             session.query(Message)
-            .filter(
-                Message.user_id == user_id
-            )
+            .filter(Message.user_id == user_id)
             .order_by(
                 Message.sent_at.desc(),
                 Message.id.desc(),
@@ -238,10 +215,7 @@ def get_openai_history(
         return [
             {
                 "role": msg.role,
-                "content": (
-                    f"[{msg.sent_at:%d/%m/%Y %H:%M}] "
-                    f"{msg.content}"
-                )
+                "content": (f"[{msg.sent_at:%d/%m/%Y %H:%M}] {msg.content}"),
             }
             for msg in messages
         ]

@@ -1,18 +1,19 @@
 import logging
 from pathlib import Path
 
-from config import LOG_LEVEL
+from config import settings
 
 
 def setup_logging():
     """
     Configura o logging da aplicação no console e arquivo (logs/app.log).
 
-    Nível controlado via variável de ambiente LOG_LEVEL (default: INFO),
+    O nível é controlado pela variável de ambiente LOG_LEVEL
+    (default: INFO).
     """
     Path("logs").mkdir(exist_ok=True)
 
-    level = getattr(logging, LOG_LEVEL, logging.INFO)
+    level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
 
     logging.basicConfig(
         level=level,
@@ -24,8 +25,6 @@ def setup_logging():
         ],
     )
 
-    # Para não poluir o log da aplicação com detalhes de requests HTTP internas.
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("openai").setLevel(logging.WARNING)
-    logging.getLogger("urllib3").setLevel(logging.WARNING)
+    # Reduz logs de bibliotecas externas.
+    for logger_name in ("httpx", "httpcore", "openai", "urllib3"):
+        logging.getLogger(logger_name).setLevel(logging.WARNING)

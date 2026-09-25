@@ -1,5 +1,7 @@
 import logging
+
 from fastapi import APIRouter
+
 from app.schemas.message import ChatRequest
 from services.agent import process_conversation
 from services.evolution import evolution_service
@@ -7,10 +9,7 @@ from services.evolution import evolution_service
 logger = logging.getLogger(__name__)
 
 
-router = APIRouter(
-    prefix="/chat",
-    tags=["Chat"],
-)
+router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
 @router.post("/")
@@ -31,8 +30,8 @@ def chat(data: ChatRequest):
     try:
         evolution_service.send_message(number=data.number, text=response)
     except Exception:
-        logger.exception("Falha ao enviar mensagem via Evolution API | number=%s", data.number)
+        logger.exception(
+            "Falha ao enviar mensagem via Evolution API | number=%s", data.number
+        )
 
-    return {
-        "response": response
-        }
+    return {"response": response}

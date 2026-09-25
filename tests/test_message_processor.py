@@ -2,12 +2,12 @@ import pytest
 
 from bot.message_processor import (
     extract_webhook_message,
+    handle_audio,
+    handle_image,
     handle_message_type,
     handle_text,
-    handle_image,
-    handle_audio,
-    normalize_phone,
     normalize_message,
+    normalize_phone,
 )
 
 
@@ -32,9 +32,7 @@ def make_raw_message():
         content="Oi, tudo bem?",
     ):
         message_body = (
-            {"conversation": content}
-            if message_type == "conversation"
-            else {}
+            {"conversation": content} if message_type == "conversation" else {}
         )
 
         return {
@@ -154,7 +152,9 @@ def test_handle_audio_returns_placeholder():
         ("audioMessage", "[Áudio enviado pelo usuário]"),
     ],
 )
-def test_handle_message_type_known_types(make_raw_message, message_type, expected_content):
+def test_handle_message_type_known_types(
+    make_raw_message, message_type, expected_content
+):
     """
     Cada tipo de mensagem conhecido deve ser encaminhado ao handler correspondente.
     """
@@ -175,7 +175,7 @@ def test_handle_message_type_unknown_type_uses_fallback(make_raw_message):
 
 
 # normalize_phone
-#   
+#
 # Recebe um JID do WhatsApp e retorna apenas o número do contato.
 
 

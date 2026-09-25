@@ -10,25 +10,17 @@ def mock_dependencies(monkeypatch):
     calls = []
 
     def fake_get_or_create_user(number, name):
-        calls.append(
-            ("get_or_create_user", {"number": number, "name": name})
-        )
+        calls.append(("get_or_create_user", {"number": number, "name": name}))
         return 42
 
     def fake_ensure_history(user_id):
-        calls.append(
-            ("ensure_history", {"user_id": user_id})
-        )
+        calls.append(("ensure_history", {"user_id": user_id}))
 
     def fake_save_message(**kwargs):
-        calls.append(
-            ("save_message", kwargs)
-        )
+        calls.append(("save_message", kwargs))
 
     def fake_get_openai_history(user_id):
-        calls.append(
-            ("get_openai_history", {"user_id": user_id})
-        )
+        calls.append(("get_openai_history", {"user_id": user_id}))
         return [
             {
                 "role": "user",
@@ -37,9 +29,7 @@ def mock_dependencies(monkeypatch):
         ]
 
     def fake_generate_response(history):
-        calls.append(
-            ("generate_response", {"history": history})
-        )
+        calls.append(("generate_response", {"history": history}))
         return "resposta gerada pela IA"
 
     monkeypatch.setattr(
@@ -90,6 +80,7 @@ def _msg(**overrides):
 
 # Fluxo normal
 
+
 def test_process_flow_order(mock_dependencies):
     """Valida ordem do processamento."""
     process_conversation(_msg())
@@ -122,10 +113,7 @@ def test_creates_user_with_data(mock_dependencies):
         )
     )
 
-    call = next(
-        c for c in mock_dependencies
-        if c[0] == "get_or_create_user"
-    )
+    call = next(c for c in mock_dependencies if c[0] == "get_or_create_user")
 
     assert call[1] == {
         "number": "5511988888888",
@@ -139,10 +127,7 @@ def test_saves_user_message(mock_dependencies):
 
     process_conversation(msg)
 
-    call = [
-        c for c in mock_dependencies
-        if c[0] == "save_message"
-    ][0]
+    call = [c for c in mock_dependencies if c[0] == "save_message"][0]
 
     assert call[1] == msg
 
@@ -156,10 +141,7 @@ def test_saves_ai_message(mock_dependencies):
         )
     )
 
-    calls = [
-        c for c in mock_dependencies
-        if c[0] == "save_message"
-    ]
+    calls = [c for c in mock_dependencies if c[0] == "save_message"]
 
     reply = calls[1][1]
 
@@ -173,10 +155,7 @@ def test_sends_history_to_ai(mock_dependencies):
     """Envia histórico salvo para IA."""
     process_conversation(_msg())
 
-    call = next(
-        c for c in mock_dependencies
-        if c[0] == "generate_response"
-    )
+    call = next(c for c in mock_dependencies if c[0] == "generate_response")
 
     assert call[1]["history"] == [
         {
@@ -188,8 +167,10 @@ def test_sends_history_to_ai(mock_dependencies):
 
 # Falha da IA
 
+
 def test_ai_error_returns_fallback(mock_dependencies, monkeypatch):
     """Retorna fallback quando IA falha."""
+
     def raise_error(history):
         raise ConnectionError()
 
@@ -209,6 +190,7 @@ def test_ai_error_returns_fallback(mock_dependencies, monkeypatch):
 
 def test_ai_error_saves_fallback(mock_dependencies, monkeypatch):
     """Salva fallback como resposta."""
+
     def raise_error(history):
         raise TimeoutError()
 
@@ -220,10 +202,7 @@ def test_ai_error_saves_fallback(mock_dependencies, monkeypatch):
 
     process_conversation(_msg())
 
-    calls = [
-        c for c in mock_dependencies
-        if c[0] == "save_message"
-    ]
+    calls = [c for c in mock_dependencies if c[0] == "save_message"]
 
     assert calls[1][1]["from_me"] is True
     assert "Desculpe" in calls[1][1]["content"]
@@ -231,6 +210,7 @@ def test_ai_error_saves_fallback(mock_dependencies, monkeypatch):
 
 def test_user_message_saved_before_ai(mock_dependencies, monkeypatch):
     """Mantém mensagem salva antes da IA."""
+
     def raise_error(history):
         raise RuntimeError()
 
@@ -242,10 +222,7 @@ def test_user_message_saved_before_ai(mock_dependencies, monkeypatch):
 
     process_conversation(_msg())
 
-    calls = [
-        c for c in mock_dependencies
-        if c[0] == "save_message"
-    ]
+    calls = [c for c in mock_dependencies if c[0] == "save_message"]
 
     assert len(calls) == 2
     assert calls[0][1]["from_me"] is False

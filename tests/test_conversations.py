@@ -1,19 +1,20 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+import database.conversations as conversations_module
+from database.conversations import (
+    TIMEZONE,
+    _get_history,
+    add_message,
+    ensure_history,
+    get_openai_history,
+    import_history_from_evolution,
+    save_message,
+    timestamp_to_datetime,
+)
 from database.models import Message, User
 from database.users import _get_or_create_user
-from database.conversations import (
-    add_message,
-    timestamp_to_datetime,
-    save_message,
-    get_openai_history,
-    ensure_history,
-    import_history_from_evolution,
-    _get_history,
-    TIMEZONE,
-)
-import database.conversations as conversations_module
+
 
 # A criação de usuários possui testes próprios em test_users.py.
 def _create_user(db_session, number="5511999999999", name="Fulano"):
@@ -78,7 +79,9 @@ def test_timestamp_to_datetime():
 
     assert isinstance(result, datetime)
     assert result.tzinfo is not None
-    assert result == datetime.fromtimestamp(1710000000, tz=ZoneInfo("America/Sao_Paulo"))
+    assert result == datetime.fromtimestamp(
+        1710000000, tz=ZoneInfo("America/Sao_Paulo")
+    )
 
 
 def test_timestamp_keeps_datetime():
@@ -121,11 +124,7 @@ def test_save_message_default_timestamp(db_session):
         message_id="MSG-NO-TIMESTAMP",
     )
 
-    message = (
-        db_session.query(Message)
-        .filter_by(message_id="MSG-NO-TIMESTAMP")
-        .one()
-    )
+    message = db_session.query(Message).filter_by(message_id="MSG-NO-TIMESTAMP").one()
 
     assert message.sent_at is not None
 
@@ -157,7 +156,9 @@ def test_save_message_generates_id(db_session):
         content="resposta sem id externo",
     )
 
-    message = db_session.query(Message).filter_by(content="resposta sem id externo").one()
+    message = (
+        db_session.query(Message).filter_by(content="resposta sem id externo").one()
+    )
     assert message.message_id is not None
     assert message.message_id != ""
 
@@ -169,13 +170,21 @@ def test_history_order(db_session):
     user = _create_user(db_session)
 
     add_message(
-        session=db_session, user=user, message_id="M2", role="user",
-        content="segunda", message_type="conversation",
+        session=db_session,
+        user=user,
+        message_id="M2",
+        role="user",
+        content="segunda",
+        message_type="conversation",
         sent_at=datetime(2024, 1, 2, tzinfo=TIMEZONE),
     )
     add_message(
-        session=db_session, user=user, message_id="M1", role="user",
-        content="primeira", message_type="conversation",
+        session=db_session,
+        user=user,
+        message_id="M1",
+        role="user",
+        content="primeira",
+        message_type="conversation",
         sent_at=datetime(2024, 1, 1, tzinfo=TIMEZONE),
     )
     db_session.commit()
@@ -193,8 +202,12 @@ def test_get_openai_history_respects_limit(db_session):
 
     for i in range(5):
         add_message(
-            session=db_session, user=user, message_id=f"M{i}", role="user",
-            content=f"msg{i}", message_type="conversation",
+            session=db_session,
+            user=user,
+            message_id=f"M{i}",
+            role="user",
+            content=f"msg{i}",
+            message_type="conversation",
             sent_at=datetime(2024, 1, i + 1, tzinfo=TIMEZONE),
         )
     db_session.commit()
@@ -224,8 +237,12 @@ def test_history_timestamp_format(db_session):
     user = _create_user(db_session)
 
     add_message(
-        session=db_session, user=user, message_id="M1", role="user",
-        content="oi", message_type="conversation",
+        session=db_session,
+        user=user,
+        message_id="M1",
+        role="user",
+        content="oi",
+        message_type="conversation",
         sent_at=datetime(2024, 3, 5, 14, 30, tzinfo=TIMEZONE),
     )
     db_session.commit()

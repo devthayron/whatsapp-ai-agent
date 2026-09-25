@@ -157,7 +157,6 @@ whatsapp-ai-agent/
 
 Para ambientes de produção, avalie o uso da API oficial do WhatsApp quando aplicável.
 
-
 ---
 
 # Banco de dados
@@ -185,15 +184,15 @@ data/
 
 ## Mensagens (`messages`)
 
-| Campo        | Descrição                                           |
-| ------------ | ----------------------------------------------------- |
-| id           | Identificador interno                                 |
-| message_id   | Identificador único da mensagem                      |
-| user_id      | Usuário relacionado                                  |
-| role         | Origem da mensagem (`user` ou `assistant`)        |
-| content      | Conteúdo da mensagem                                 |
-| message_type | Origem da mensagem (Webhook, Evolution API ou OpenAI) |
-| sent_at      | Data e hora da mensagem                               |
+| Campo        | Descrição                                    |
+| ------------ | ---------------------------------------------- |
+| id           | Identificador interno                          |
+| message_id   | Identificador único da mensagem               |
+| user_id      | Usuário relacionado                           |
+| role         | Origem da mensagem (`user` ou `assistant`) |
+| content      | Conteúdo da mensagem                          |
+| message_type | Tipo da mensagem                              |
+| sent_at      | Data e hora da mensagem                        |
 
 ---
 
@@ -253,7 +252,6 @@ As instruções para executar a aplicação e a configuração do ambiente de de
 
 ---
 
-
 # Testes
 
 O projeto possui testes automatizados utilizando **Pytest**.
@@ -262,12 +260,6 @@ Para executar todos os testes:
 
 ```bash
 python -m pytest -v
-```
-
-Para executar um arquivo específico:
-
-```bash
-python -m pytest tests/test_agent.py -v
 ```
 
 ---

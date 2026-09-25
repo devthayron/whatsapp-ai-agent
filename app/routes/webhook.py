@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 
-from bot.message_processor import normalize_message, extract_webhook_message
+from bot.message_processor import extract_webhook_message, normalize_message
 from services.agent import process_conversation
 from services.evolution import evolution_service
 
@@ -11,12 +11,12 @@ router = APIRouter(prefix="/webhook", tags=["Webhook"])
 async def webhook(request: Request):
 
     payload = await request.json()
-    # print(payload)
+
     raw_message = extract_webhook_message(payload)
 
     if not raw_message:
         return {"status": "ignored"}
-    
+
     msg = normalize_message(raw_message)
 
     if not msg:
@@ -24,11 +24,6 @@ async def webhook(request: Request):
 
     response = process_conversation(msg)
 
-    evolution_service.send_message(
-        number=msg["number"],
-        text=response,
-    )
+    evolution_service.send_message(number=msg["number"], text=response)
 
-    return {
-        "status": "processed"
-    }
+    return {"status": "processed"}

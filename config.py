@@ -1,26 +1,26 @@
-import os
-from dotenv import load_dotenv
-import requests
+from functools import lru_cache
 
-load_dotenv()
-
-API_KEY_EVO = os.getenv("API_KEY_EVO")
-BASE_URL = os.getenv("BASE_URL")
-INSTANCE = os.getenv("INSTANCE")
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-
-if not all([API_KEY_EVO, BASE_URL, INSTANCE]):
-    raise RuntimeError("Variáveis de ambiente faltando. Verifique API_KEY_EVO, BASE_URL e INSTANCE no .env")
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-URL_GET_MESSAGES = f"{BASE_URL}/chat/findMessages/{INSTANCE}"
-URL_SEND_MESSAGES = f"{BASE_URL}/message/sendText/{INSTANCE}"
+class Settings(BaseSettings):
+    API_KEY_EVO: str
+    BASE_URL: str
+    INSTANCE: str
+    OPENAI_API_KEY: str
+
+    LOG_LEVEL: str = "INFO"
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
-HEADERS = {
-    "apikey": API_KEY_EVO,
-    "Content-Type": "application/json",
-}
+@lru_cache
+def get_settings():
+    return Settings()
 
-SESSION = requests.Session()
-SESSION.headers.update(HEADERS)
+
+settings = get_settings()

@@ -1,16 +1,16 @@
 import logging
 import time
-from openai import OpenAI
-from dotenv import load_dotenv
 
-load_dotenv()
+from openai import OpenAI
+
+from config import settings
 
 logger = logging.getLogger(__name__)
 
-# PROMPT = {
-#     "id": "pmpt_6a4c03086f2081939978a699ca50ad7d0fe8ed8ab07bf32a",  # ID do prompt configurado no OpenAI Platform
-#     "version": "3"
-# }
+PROMPT = {
+    "id": "pmpt_6a4c03086f2081939978a699ca50ad7d0fe8ed8ab07bf32a",  # ID do prompt configurado no OpenAI Platform
+    "version": "3",
+}
 
 instrucao = """
 Você é um agente de IA para WhatsApp.
@@ -24,9 +24,10 @@ Siga estas regras:
 - Seja objetivo, natural e mantenha a continuidade da conversa.
 """
 
+
 class OpenAIService:
     def __init__(self):
-        self.client = OpenAI()
+        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = "gpt-5.4-nano"
 
     def generate_response(self, messages: list) -> str:
@@ -42,16 +43,13 @@ class OpenAIService:
         try:
             response = self.client.responses.create(
                 model=self.model,
-                # prompt=PROMPT,
+                prompt=PROMPT,
                 instructions=instrucao,
                 input=messages,
             )
 
         except Exception:
-            logger.exception(
-                "Erro ao gerar resposta da OpenAI | model=%s",
-                self.model,
-            )
+            logger.exception("Erro ao gerar resposta da OpenAI | model=%s", self.model)
             raise
 
         elapsed = time.monotonic() - start
@@ -64,9 +62,7 @@ class OpenAIService:
             )
 
         logger.info(
-            "Resposta da OpenAI gerada | model=%s | tempo=%.2fs",
-            self.model,
-            elapsed,
+            "Resposta da OpenAI gerada | model=%s | tempo=%.2fs", self.model, elapsed
         )
 
         return response.output_text

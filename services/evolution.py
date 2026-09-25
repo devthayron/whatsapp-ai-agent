@@ -1,14 +1,27 @@
 import logging
 
-from config import (
-    SESSION,
-    URL_GET_MESSAGES,
-    URL_SEND_MESSAGES,
-)
+import requests
+
+from config import settings
 
 logger = logging.getLogger(__name__)
 
+
 class EvolutionService:
+    def __init__(self):
+
+        self.base_url = settings.BASE_URL
+        self.instance = settings.INSTANCE
+
+        self.url_get_messages = f"{self.base_url}/chat/findMessages/{self.instance}"
+
+        self.url_send_messages = f"{self.base_url}/message/sendText/{self.instance}"
+
+        self.session = requests.Session()
+
+        self.session.headers.update(
+            {"apikey": settings.API_KEY_EVO, "Content-Type": "application/json"}
+        )
 
     def get_messages(self, page=1):
 
@@ -17,38 +30,30 @@ class EvolutionService:
         }
 
         try:
-            response = SESSION.post(
-                URL_GET_MESSAGES,
-                json=payload,
-            )
+            response = self.session.post(self.url_get_messages, json=payload)
 
             response.raise_for_status()
 
         except Exception:
             logger.exception(
-                "Erro ao buscar mensagens na Evolution API | url=%s | page=%s",
-                URL_GET_MESSAGES,
+                "Erro ao buscar mensagens | url=%s | page=%s",
+                self.url_get_messages,
                 page,
             )
             raise
 
         return response.json()["messages"]
 
-
     def get_all_messages(self):
-        """Busca todas as mensagens percorrendo as páginas da API."""
 
         records = []
 
         page = 1
 
         while True:
-
             data = self.get_messages(page)
 
-            records.extend(
-                data["records"]
-            )
+            records.extend(data["records"])
 
             if page >= data["pages"]:
                 break
@@ -57,77 +62,49 @@ class EvolutionService:
 
         return records
 
-
     def get_messages_by_number(self, number: str):
-        """
-        Busca mensagens de um contato diretamente pela API.
-
-        Pesquisa usando remoteJid e remoteJidAlt.
-        """
 
         jid = f"{number}@s.whatsapp.net"
 
         messages = []
 
-        for field in [
-            "remoteJid",
-            "remoteJidAlt",
-        ]:
-
+        for field in ["remoteJid", "remoteJidAlt"]:
             page = 1
 
             while True:
-
                 payload = {
-                    "where": {
-                        "key": {
-                            field: jid
-                        }
-                    },
+                    "where": {"key": {field: jid}},
                     "page": page,
                 }
 
                 try:
-                    response = SESSION.post(
-                        URL_GET_MESSAGES,
-                        json=payload,
-                    )
+                    response = self.session.post(self.url_get_messages, json=payload)
 
                     response.raise_for_status()
+
                 except Exception:
                     logger.exception(
-                        "Erro ao buscar mensagens por número | number=%s | campo=%s | page=%s",
-                        number,
-                        field,
-                        page,
+                        "Erro ao buscar mensagens | number=%s | field=%s", number, field
                     )
+
                     raise
 
                 data = response.json()["messages"]
 
-                messages.extend(
-                    data["records"]
-                )
+                messages.extend(data["records"])
 
                 if page >= data["pages"]:
                     break
 
                 page += 1
 
-
-        unique = {
-            msg["id"]: msg
-            for msg in messages
-        }
+        unique = {msg["id"]: msg for msg in messages}
 
         logger.debug(
-            "Mensagens únicas encontradas para o número | number=%s | total=%s",
-            number,
-            len(unique),
+            "Mensagens encontradas | number=%s | total=%s", number, len(unique)
         )
 
         return list(unique.values())
-
 
     def send_message(
         self,
@@ -135,32 +112,20 @@ class EvolutionService:
         text: str,
     ):
 
-        payload = {
-            "number": f"{number}@s.whatsapp.net",
-            "text": text,
-        }
+        payload = {"number": f"{number}@s.whatsapp.net", "text": text}
 
         try:
-            response = SESSION.post(
-                URL_SEND_MESSAGES,
-                json=payload,
-            )
+            response = self.session.post(self.url_send_messages, json=payload)
 
             response.raise_for_status()
+
         except Exception:
-            logger.exception(
-                "Erro ao enviar mensagem via Evolution API | number=%s | url=%s",
-                number,
-                URL_SEND_MESSAGES,
-            )
+            logger.exception("Erro ao enviar mensagem | number=%s", number)
+
             raise
 
-        logger.info(
-            "Mensagem enviada com sucesso | number=%s",
-            number,
-        )
+        logger.info("Mensagem enviada | number=%s", number)
 
-        
         return response.json()
 
 
