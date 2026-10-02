@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Request
 
-from bot.message_processor import extract_webhook_message, normalize_message
-from services.agent import process_conversation
-from services.evolution import evolution_service
+from agent.processor import process_conversation
+from integrations.evolution.client import evolution_service
+from integrations.evolution.parser import extract_webhook_message, normalize_message
 
 router = APIRouter(prefix="/webhook", tags=["Webhook"])
 

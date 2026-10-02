@@ -16,26 +16,30 @@ from database.connection import Base
 def db_session(monkeypatch):
     """
     Cria um banco SQLite em memória isolado por teste, cria as tabelas
-    e substitui o SessionLocal usado pelos módulos de banco para que
-    nenhum teste toque no arquivo data/conversations.db real.
+    e substitui o SessionLocal usado pelos módulos para que nenhum teste
+    toque no banco real.
     """
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
     )
+
     Base.metadata.create_all(bind=engine)
 
     TestingSessionLocal = sessionmaker(
-        bind=engine,
-        autoflush=False,
-        autocommit=False,
-        expire_on_commit=False,
+        bind=engine, autoflush=False, autocommit=False, expire_on_commit=False
     )
 
     monkeypatch.setattr("database.users.SessionLocal", TestingSessionLocal)
+
     monkeypatch.setattr("database.conversations.SessionLocal", TestingSessionLocal)
 
+    monkeypatch.setattr(
+        "integrations.evolution.history.SessionLocal", TestingSessionLocal
+    )
+
     session = TestingSessionLocal()
+
     try:
         yield session
     finally:

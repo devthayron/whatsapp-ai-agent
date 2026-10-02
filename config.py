@@ -7,7 +7,11 @@ class Settings(BaseSettings):
     API_KEY_EVO: str
     BASE_URL: str
     INSTANCE: str
+
     OPENAI_API_KEY: str
+
+    AI_PROVIDER: str = "openai"
+    AI_MODEL: str = "gpt-5.4-nano"
 
     LOG_LEVEL: str = "INFO"
 

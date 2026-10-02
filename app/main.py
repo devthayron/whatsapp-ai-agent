@@ -5,7 +5,7 @@ from logger import setup_logging
 setup_logging()
 
 from app.routes.chat import router as chat_router
-from app.routes.webhook import router as webhook_router
+from app.routes.webhook_evolution import router as webhook_router
 from database.connection import Base, engine
 
 app = FastAPI()

@@ -2,9 +2,9 @@ import logging
 
 from fastapi import APIRouter
 
-from app.schemas.message import ChatRequest
-from services.agent import process_conversation
-from services.evolution import evolution_service
+from agent.processor import process_conversation
+from app.schemas.chat import ChatRequest
+from integrations.evolution.client import evolution_service
 
 logger = logging.getLogger(__name__)
 

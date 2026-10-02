@@ -1,6 +1,6 @@
 import pytest
 
-from bot.message_processor import (
+from integrations.evolution.parser import (
     extract_webhook_message,
     handle_audio,
     handle_image,

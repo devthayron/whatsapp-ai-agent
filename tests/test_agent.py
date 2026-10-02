@@ -1,7 +1,7 @@
 import pytest
 
-import services.agent as agent_module
-from services.agent import process_conversation
+import agent.processor as agent_module
+from agent.processor import process_conversation
 
 
 @pytest.fixture
@@ -19,8 +19,8 @@ def mock_dependencies(monkeypatch):
     def fake_save_message(**kwargs):
         calls.append(("save_message", kwargs))
 
-    def fake_get_openai_history(user_id):
-        calls.append(("get_openai_history", {"user_id": user_id}))
+    def fake_get_message_history(user_id):
+        calls.append(("get_message_history", {"user_id": user_id}))
         return [
             {
                 "role": "user",
@@ -49,11 +49,11 @@ def mock_dependencies(monkeypatch):
     )
     monkeypatch.setattr(
         agent_module,
-        "get_openai_history",
-        fake_get_openai_history,
+        "get_message_history",
+        fake_get_message_history,
     )
     monkeypatch.setattr(
-        agent_module.openai_service,
+        agent_module,
         "generate_response",
         fake_generate_response,
     )
@@ -91,7 +91,7 @@ def test_process_flow_order(mock_dependencies):
         "get_or_create_user",
         "ensure_history",
         "save_message",
-        "get_openai_history",
+        "get_message_history",
         "generate_response",
         "save_message",
     ]
@@ -175,7 +175,7 @@ def test_ai_error_returns_fallback(mock_dependencies, monkeypatch):
         raise ConnectionError()
 
     monkeypatch.setattr(
-        agent_module.openai_service,
+        agent_module,
         "generate_response",
         raise_error,
     )
@@ -195,7 +195,7 @@ def test_ai_error_saves_fallback(mock_dependencies, monkeypatch):
         raise TimeoutError()
 
     monkeypatch.setattr(
-        agent_module.openai_service,
+        agent_module,
         "generate_response",
         raise_error,
     )
@@ -215,7 +215,7 @@ def test_user_message_saved_before_ai(mock_dependencies, monkeypatch):
         raise RuntimeError()
 
     monkeypatch.setattr(
-        agent_module.openai_service,
+        agent_module,
         "generate_response",
         raise_error,
     )
