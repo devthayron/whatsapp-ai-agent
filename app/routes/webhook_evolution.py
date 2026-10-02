@@ -24,6 +24,9 @@ async def webhook(request: Request):
 
     response = process_conversation(msg)
 
+    if response is None:
+        return {"status": "duplicate"}
+
     evolution_service.send_message(number=msg["number"], text=response)
 
     return {"status": "processed"}

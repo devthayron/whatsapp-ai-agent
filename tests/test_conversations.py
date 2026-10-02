@@ -208,7 +208,7 @@ def test_history_order(db_session):
 
     history = get_message_history(user.id)
 
-    assert [message["content"].split("] ")[1] for message in history] == [
+    assert [message["content"] for message in history] == [
         "primeira",
         "segunda",
     ]
@@ -245,7 +245,7 @@ def test_get_message_history_respects_limit(db_session):
 
     assert len(history) == 2
 
-    assert [message["content"].split("] ")[1] for message in history] == [
+    assert [message["content"] for message in history] == [
         "msg3",
         "msg4",
     ]
@@ -262,9 +262,9 @@ def test_empty_history(db_session):
     assert history == []
 
 
-def test_history_timestamp_format(db_session):
+def test_history_content_has_no_timestamp(db_session):
     """
-    Adiciona timestamp no conteúdo do histórico.
+    O conteúdo do histórico é enviado sem prefixo de data.
     """
     user = _create_user(db_session)
 
@@ -289,5 +289,4 @@ def test_history_timestamp_format(db_session):
 
     history = get_message_history(user.id)
 
-    assert history[0]["content"] == "[05/03/2024 14:30] oi"
-    assert history[0]["role"] == "user"
+    assert history[0] == {"role": "user", "content": "oi"}

@@ -21,31 +21,14 @@ def client():
 
 @pytest.fixture
 def mock_chat_dependencies(monkeypatch):
-    """Mocka dependências da rota chat."""
+    """Mocka dependências da rota chat (a rota não envia pelo WhatsApp)."""
     calls = []
 
     def fake_process_conversation(message):
         calls.append(("process_conversation", message))
         return "resposta simulada"
 
-    def fake_send_message(number, text):
-        calls.append(
-            (
-                "send_message",
-                {
-                    "number": number,
-                    "text": text,
-                },
-            )
-        )
-
-        return {"status": "ok"}
-
     monkeypatch.setattr(chat_module, "process_conversation", fake_process_conversation)
-
-    monkeypatch.setattr(
-        chat_module.evolution_service, "send_message", fake_send_message
-    )
 
     return calls
 
@@ -122,24 +105,6 @@ def test_chat_builds_message(client, mock_chat_dependencies):
         "message_type": "chat",
         "message_id": None,
         "timestamp": None,
-    }
-
-
-def test_chat_sends_message(client, mock_chat_dependencies):
-    """Envia resposta pelo WhatsApp."""
-    client.post(
-        "/chat/",
-        json={
-            "number": "5511999999999",
-            "content": "Oi",
-        },
-    )
-
-    call = next(c for c in mock_chat_dependencies if c[0] == "send_message")
-
-    assert call[1] == {
-        "number": "5511999999999",
-        "text": "resposta simulada",
     }
 
 
@@ -276,20 +241,27 @@ def test_webhook_ignores_invalid_message(
     assert mock_webhook_dependencies == []
 
 
-def test_chat_evolution_error(client, mock_chat_dependencies, monkeypatch):
-    """Propaga erro do envio."""
+def test_webhook_ignores_non_text(client, mock_webhook_dependencies):
+    """Áudio, imagem etc. não chegam ao LLM."""
+    payload = _payload()
+    payload["data"]["messageType"] = "audioMessage"
+    payload["data"]["message"] = {}
 
-    def error(number, text):
-        raise Exception("Evolution offline")
+    response = client.post("/webhook/", json=payload)
 
-    monkeypatch.setattr(chat_module.evolution_service, "send_message", error)
+    assert response.json() == {"status": "ignored"}
+    assert mock_webhook_dependencies == []
 
-    response = client.post(
-        "/chat/",
-        json={
-            "number": "5511999999999",
-            "content": "Oi",
-        },
-    )
+
+def test_webhook_duplicate_does_not_send(
+    client, mock_webhook_dependencies, monkeypatch
+):
+    """Mensagem duplicada retorna 200 e não tenta enviar nada."""
+    monkeypatch.setattr(webhook_module, "process_conversation", lambda msg: None)
+
+    response = client.post("/webhook/", json=_payload())
 
     assert response.status_code == 200
+    assert response.json() == {"status": "duplicate"}
+
+    assert not any(c[0] == "send_message" for c in mock_webhook_dependencies)

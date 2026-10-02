@@ -15,13 +15,14 @@ def mock_dependencies(monkeypatch):
 
     def fake_save_message(**kwargs):
         calls.append(("save_message", kwargs))
+        return True
 
     def fake_get_message_history(user_id):
         calls.append(("get_message_history", {"user_id": user_id}))
         return [
             {
                 "role": "user",
-                "content": "[01/01/2024 10:00] oi",
+                "content": "oi",
             }
         ]
 
@@ -151,9 +152,31 @@ def test_sends_history_to_ai(mock_dependencies):
     assert call[1]["history"] == [
         {
             "role": "user",
-            "content": "[01/01/2024 10:00] oi",
+            "content": "oi",
         }
     ]
+
+
+# Mensagem duplicada
+
+
+def test_duplicate_message_returns_none(mock_dependencies, monkeypatch):
+    """Mensagem duplicada não é respondida."""
+    monkeypatch.setattr(agent_module, "save_message", lambda **kwargs: False)
+
+    assert process_conversation(_msg()) is None
+
+
+def test_duplicate_message_does_not_call_ai(mock_dependencies, monkeypatch):
+    """Mensagem duplicada não chama a IA nem busca histórico."""
+    monkeypatch.setattr(agent_module, "save_message", lambda **kwargs: False)
+
+    process_conversation(_msg())
+
+    steps = [call[0] for call in mock_dependencies]
+
+    assert "generate_response" not in steps
+    assert "get_message_history" not in steps
 
 
 # Falha da IA
