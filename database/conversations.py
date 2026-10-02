@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.exc import IntegrityError
 
 from database.connection import SessionLocal
-from database.models import Message, User
+from database.models import Message
 from database.users import _get_or_create_user
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ def add_message(
             "Mensagem duplicada ignorada | message_id=%s",
             message_id,
         )
-        return
+        return False
 
     session.add(
         Message(
@@ -43,6 +43,7 @@ def add_message(
             sent_at=sent_at,
         )
     )
+    return True
 
 
 def timestamp_to_datetime(timestamp):
@@ -79,7 +80,7 @@ def save_message(
             push_name,
         )
 
-        add_message(
+        saved = add_message(
             session=session,
             user=user,
             message_id=message_id,
@@ -88,6 +89,8 @@ def save_message(
             message_type=message_type,
             sent_at=sent_at,
         )
+        if not saved:
+            return False
 
         try:
             session.commit()
@@ -109,12 +112,12 @@ def save_message(
                 message_id,
             )
 
+            return False
 
-# analisar mais a frente o desacoplamento e retornar apenas msgs
-def get_message_history(
-    user_id,
-    limit=CONTEXT_MESSAGES_LIMIT,
-):
+    return True
+
+
+def get_message_history(user_id, limit=CONTEXT_MESSAGES_LIMIT):
     """
     Retorna as últimas mensagens da conversa,
     preservando a ordem cronológica.
@@ -133,61 +136,12 @@ def get_message_history(
 
         messages.reverse()
 
-        logger.debug(
-            "Histórico recuperado | total_messages=%s",
-            len(messages),
-        )
+        logger.debug("Histórico recuperado | total_messages=%s", len(messages))
 
         return [
             {
                 "role": message.role,
-                "content": (f"[{message.sent_at:%d/%m/%Y %H:%M}] {message.content}"),
+                "content": (message.content or "").strip(),
             }
             for message in messages
         ]
-
-
-def import_history(user_id, messages):
-    """
-    Persiste no banco um histórico já normalizado.
-
-    Não conhece a origem das mensagens.
-    """
-    with SessionLocal() as session:
-        user = session.query(User).filter_by(id=user_id).one()
-
-        for message in messages:
-            add_message(
-                session=session,
-                user=user,
-                message_id=message["message_id"],
-                role="assistant" if message["from_me"] else "user",
-                content=message["content"],
-                message_type=message.get(
-                    "message_type",
-                    "conversation",
-                ),
-                sent_at=timestamp_to_datetime(
-                    message["timestamp"],
-                ),
-            )
-
-        user.history_imported = True
-
-        try:
-            session.commit()
-
-            logger.info(
-                "Histórico importado | user_id=%s | total_messages=%s",
-                user_id,
-                len(messages),
-            )
-
-        except IntegrityError:
-            session.rollback()
-
-            logger.exception(
-                "Erro ao importar histórico | user_id=%s",
-                user_id,
-            )
-            raise

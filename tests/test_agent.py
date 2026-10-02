@@ -13,9 +13,6 @@ def mock_dependencies(monkeypatch):
         calls.append(("get_or_create_user", {"number": number, "name": name}))
         return 42
 
-    def fake_ensure_history(user_id):
-        calls.append(("ensure_history", {"user_id": user_id}))
-
     def fake_save_message(**kwargs):
         calls.append(("save_message", kwargs))
 
@@ -36,11 +33,6 @@ def mock_dependencies(monkeypatch):
         agent_module,
         "get_or_create_user",
         fake_get_or_create_user,
-    )
-    monkeypatch.setattr(
-        agent_module,
-        "ensure_history",
-        fake_ensure_history,
     )
     monkeypatch.setattr(
         agent_module,
@@ -89,7 +81,6 @@ def test_process_flow_order(mock_dependencies):
 
     assert steps == [
         "get_or_create_user",
-        "ensure_history",
         "save_message",
         "get_message_history",
         "generate_response",

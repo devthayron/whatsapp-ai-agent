@@ -34,10 +34,6 @@ def db_session(monkeypatch):
 
     monkeypatch.setattr("database.conversations.SessionLocal", TestingSessionLocal)
 
-    monkeypatch.setattr(
-        "integrations.evolution.history.SessionLocal", TestingSessionLocal
-    )
-
     session = TestingSessionLocal()
 
     try:

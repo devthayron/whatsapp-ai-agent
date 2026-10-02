@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     AI_PROVIDER: str = "openai"
     AI_MODEL: str = "gpt-5.4-nano"
 
-    LOG_LEVEL: str = "INFO"
+    LOG_LEVEL: str = "DEBUG"
 
     model_config = SettingsConfigDict(
         env_file=".env",

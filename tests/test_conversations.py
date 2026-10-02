@@ -1,18 +1,15 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-import integrations.evolution.history as evolution_history_module
 from database.conversations import (
     TIMEZONE,
     add_message,
     get_message_history,
-    import_history,
     save_message,
     timestamp_to_datetime,
 )
 from database.models import Message, User
 from database.users import _get_or_create_user
-from integrations.evolution.history import ensure_history, get_history
 
 
 # A criação de usuários possui testes próprios em test_users.py.
@@ -294,162 +291,3 @@ def test_history_timestamp_format(db_session):
 
     assert history[0]["content"] == "[05/03/2024 14:30] oi"
     assert history[0]["role"] == "user"
-
-
-def test_ensure_history_imports_new_user(db_session, monkeypatch):
-    """
-    Importa histórico quando usuário ainda não foi sincronizado.
-    """
-    user = _create_user(db_session)
-
-    assert user.history_imported is False
-
-    monkeypatch.setattr(
-        evolution_history_module,
-        "get_history",
-        lambda number: [],
-    )
-
-    imported = {"value": False}
-
-    def fake_import_history(user_id, messages):
-        imported["value"] = True
-
-        assert user_id == user.id
-        assert messages == []
-
-    monkeypatch.setattr(
-        evolution_history_module,
-        "import_history",
-        fake_import_history,
-    )
-
-    ensure_history(user.id)
-
-    assert imported["value"] is True
-
-
-def test_ensure_history_skips_existing_history(db_session, monkeypatch):
-    """
-    Não busca nem importa histórico quando ele já foi sincronizado.
-    """
-    user = _create_user(db_session)
-
-    user.history_imported = True
-    db_session.commit()
-
-    called = {"value": False}
-
-    def fake_get_history(number):
-        called["value"] = True
-        return []
-
-    monkeypatch.setattr(
-        evolution_history_module,
-        "get_history",
-        fake_get_history,
-    )
-
-    ensure_history(user.id)
-
-    assert called["value"] is False
-
-
-def test_get_history_ignores_invalid_messages(monkeypatch):
-    """
-    Ignora mensagens da Evolution API que não podem ser normalizadas.
-    """
-    invalid_messages = [
-        {
-            "key": {},
-            "messageType": "conversation",
-        }
-    ]
-
-    monkeypatch.setattr(
-        evolution_history_module.evolution_service,
-        "get_messages_by_number",
-        lambda number: invalid_messages,
-    )
-
-    history = get_history("5511999999999")
-
-    assert history == []
-
-
-def test_import_history_saves_messages(db_session):
-    """
-    Persiste mensagens já normalizadas no banco.
-    """
-    user = _create_user(
-        db_session,
-        number="5511955555555",
-    )
-
-    messages = [
-        {
-            "message_id": "EVO-1",
-            "from_me": False,
-            "number": "5511955555555",
-            "push_name": "Fulano",
-            "content": "mensagem antiga do usuário",
-            "message_type": "conversation",
-            "timestamp": 1700000000,
-        },
-        {
-            "message_id": "EVO-2",
-            "from_me": True,
-            "number": "5511955555555",
-            "push_name": "Fulano",
-            "content": "resposta antiga do bot",
-            "message_type": "conversation",
-            "timestamp": 1700000100,
-        },
-    ]
-
-    import_history(user.id, messages)
-
-    saved_messages = (
-        db_session.query(Message)
-        .filter_by(user_id=user.id)
-        .order_by(Message.sent_at)
-        .all()
-    )
-
-    assert [message.message_id for message in saved_messages] == [
-        "EVO-1",
-        "EVO-2",
-    ]
-
-    assert saved_messages[0].role == "user"
-    assert saved_messages[1].role == "assistant"
-
-    db_session.expire_all()
-
-    refreshed = db_session.query(User).filter_by(id=user.id).one()
-
-    assert refreshed.history_imported is True
-
-
-def test_ensure_history_api_error(db_session, monkeypatch):
-    """
-    Não conclui sincronização quando a busca do histórico falha.
-    """
-    user = _create_user(
-        db_session,
-        number="5511944444444",
-    )
-
-    monkeypatch.setattr(
-        evolution_history_module,
-        "get_history",
-        lambda number: None,
-    )
-
-    ensure_history(user.id)
-
-    refreshed = db_session.query(User).filter_by(id=user.id).one()
-
-    assert refreshed.history_imported is False
-
-    assert db_session.query(Message).filter_by(user_id=user.id).count() == 0

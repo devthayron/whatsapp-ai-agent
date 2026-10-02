@@ -38,34 +38,42 @@ def extract_webhook_message(payload):
 
 
 def handle_text(raw_message):
+    """Texto simples."""
     return raw_message.get("message", {}).get("conversation")
 
 
-def handle_image(raw_message):
-    return "[Imagem enviada pelo usuário]"
+def handle_extended_text(raw_message):
+    """Texto com link, resposta (reply) ou preview."""
+    return raw_message.get("message", {}).get("extendedTextMessage", {}).get("text")
 
 
-def handle_audio(raw_message):
-    return "[Áudio enviado pelo usuário]"
-
-
+# Apenas tipos de texto são suportados. Qualquer outro tipo é ignorado.
 MESSAGE_TYPE_HANDLERS = {
     "conversation": handle_text,
-    "imageMessage": handle_image,
-    "audioMessage": handle_audio,
+    "extendedTextMessage": handle_extended_text,
 }
 
 
 def handle_message_type(raw_message):
+    """
+    Retorna (message_type, content).
+
+    content é None quando o tipo não é suportado ou não há texto.
+    """
     message_type = raw_message.get("messageType")
 
     handler = MESSAGE_TYPE_HANDLERS.get(message_type)
 
-    if handler:
-        return message_type, handler(raw_message)
+    if handler is None:
+        logger.debug("Tipo de mensagem ignorado | message_type=%s", message_type)
+        return message_type, None
 
-    logger.warning("Tipo de mensagem não tratado | message_type=%s", message_type)
-    return message_type, f"[Mensagem do tipo: {message_type}]"
+    content = handler(raw_message)
+
+    if not isinstance(content, str) or not content.strip():
+        return message_type, None
+
+    return message_type, content.strip()
 
 
 def normalize_phone(number: str | None) -> str | None:
@@ -86,8 +94,16 @@ def normalize_message(raw_message):
     timestamp = raw_message.get("messageTimestamp")
     push_name = raw_message.get("pushName")
 
-    # Extrai o conteúdo conforme o tipo da mensagem.
+    # Extrai o conteúdo; só mensagens de texto passam.
     message_type, content = handle_message_type(raw_message)
+
+    if content is None:
+        logger.debug(
+            "Mensagem ignorada | motivo=não é texto | message_type=%s | message_id=%s",
+            message_type,
+            message_id,
+        )
+        return None
 
     # Número do contato da conversa
     number = normalize_phone(remote_jid_alt or remote_jid)

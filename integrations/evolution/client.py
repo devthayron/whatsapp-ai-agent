@@ -15,7 +15,6 @@ class EvolutionService:
         self.base_url = settings.BASE_URL
         self.instance = settings.INSTANCE
 
-        self.url_get_messages = f"{self.base_url}/chat/findMessages/{self.instance}"
         self.url_send_messages = f"{self.base_url}/message/sendText/{self.instance}"
 
         self.session = requests.Session()
@@ -28,11 +27,7 @@ class EvolutionService:
 
     def _post(self, url, payload, operation):
         try:
-            response = self.session.post(
-                url,
-                json=payload,
-                timeout=REQUEST_TIMEOUT,
-            )
+            response = self.session.post(url, json=payload, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
 
         except requests.HTTPError:
@@ -66,80 +61,6 @@ class EvolutionService:
                 response.text[:ERROR_RESPONSE_LIMIT],
             )
             raise
-
-    def get_messages(self, page=1):
-        response = self._post(
-            url=self.url_get_messages,
-            payload={"page": page},
-            operation="buscar mensagens",
-        )
-
-        data = self._get_json(response)
-
-        return data["messages"]
-
-    def get_all_messages(self):
-        records = []
-        page = 1
-
-        while True:
-            data = self.get_messages(page)
-
-            records.extend(data["records"])
-
-            if page >= data["pages"]:
-                break
-
-            page += 1
-
-        logger.debug(
-            "Todas as mensagens recuperadas | total=%s",
-            len(records),
-        )
-
-        return records
-
-    def get_messages_by_number(self, number: str):
-        jid = f"{number}@s.whatsapp.net"
-        messages = []
-
-        for field in ("remoteJid", "remoteJidAlt"):
-            page = 1
-
-            while True:
-                payload = {
-                    "where": {
-                        "key": {
-                            field: jid,
-                        }
-                    },
-                    "page": page,
-                }
-
-                response = self._post(
-                    url=self.url_get_messages,
-                    payload=payload,
-                    operation=f"buscar mensagens por número ({field})",
-                )
-
-                data = self._get_json(response)["messages"]
-
-                messages.extend(data["records"])
-
-                if page >= data["pages"]:
-                    break
-
-                page += 1
-
-        unique_messages = {message["id"]: message for message in messages}
-
-        logger.debug(
-            "Mensagens encontradas | number=%s | total=%s",
-            number,
-            len(unique_messages),
-        )
-
-        return list(unique_messages.values())
 
     def send_message(self, number: str, text: str):
         payload = {

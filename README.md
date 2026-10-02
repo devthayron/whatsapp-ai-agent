@@ -15,10 +15,9 @@ Sistema de agente de IA integrado ao WhatsApp por meio da Evolution API, capaz d
 * Integração entre WhatsApp, Evolution API, OpenAI e banco de dados
 * Recebimento e processamento de mensagens via webhook
 * Identificação automática de usuários
-* Armazenamento persistente do histórico de conversas
-* Importação automática do histórico existente no primeiro contato
-* Recuperação de contexto para respostas mais precisas
-* Geração de respostas contextualizadas utilizando modelos da OpenAI
+* Armazenamento persistente das mensagens recebidas e enviadas
+* Recuperação de contexto a partir do histórico salvo no banco
+* Geração de respostas contextualizadas utilizando modelos da OpenAI (via LangChain)
 * Controle de mensagens duplicadas
 * Envio automático das respostas pelo WhatsApp
 * Sistema de logs estruturado (console e arquivo)
@@ -31,14 +30,13 @@ Sistema de agente de IA integrado ao WhatsApp por meio da Evolution API, capaz d
 Quando um usuário envia uma mensagem:
 
 1. A mensagem chega pelo WhatsApp através da Evolution API.
-2. O sistema identifica o usuário pelo número do telefone.
-3. É verificado se já existe histórico desse usuário armazenado no banco de dados.
-4. Caso exista, o histórico salvo é utilizado como contexto da conversa.
-5. Caso seja o primeiro contato, o sistema importa automaticamente o histórico existente na Evolution API.
-6. As mensagens encontradas são organizadas por data e armazenadas no banco.
-7. Após a primeira importação, o histórico salvo passa a ser reutilizado nas próximas interações.
+2. O sistema identifica (ou cria) o usuário pelo número do telefone.
+3. A mensagem recebida é salva no banco de dados.
+4. As últimas mensagens da conversa (limite de 30) são recuperadas do banco, em ordem cronológica.
+5. Esse histórico é enviado ao modelo de IA como contexto.
+6. A resposta gerada é salva no banco e enviada ao usuário pelo WhatsApp.
 
-> A sincronização do histórico acontece apenas no primeiro contato de cada usuário, reduzindo consultas desnecessárias à Evolution API.
+> O contexto é construído **exclusivamente** com as mensagens que passaram pela aplicação.
 
 ---
 
@@ -57,38 +55,27 @@ Webhook
 Processamento da mensagem
     │
     ▼
-Identificar usuário
+Identificar/criar usuário
     │
     ▼
-Verificar histórico
+Salvar mensagem recebida
     │
-    ├───────────────┐
-    │               │
-    ▼               ▼
-Existe histórico  Primeiro contato
-    │               │
-    ▼               ▼
-Usar histórico   Importar histórico
-do banco         da Evolution API
-    │               │
-    └───────┬───────┘
-            │
-            ▼
- Recuperar contexto
-            │
-            ▼
-     Agente de IA
-            │
-            ▼
-     Modelo OpenAI
-            │
-            ▼
-     Gerar resposta
-            │
-            ▼
- Salvar no banco de dados
-            │
-            ▼
+    ▼
+Recuperar histórico do banco
+    │
+    ▼
+Agente de IA (LangChain)
+    │
+    ▼
+Modelo OpenAI
+    │
+    ▼
+Gerar resposta
+    │
+    ▼
+Salvar resposta no banco de dados
+    │
+    ▼
 Enviar resposta no WhatsApp
 ```
 
@@ -101,18 +88,20 @@ whatsapp-ai-agent/
 ├── app/                              # aplicação FastAPI
 │   ├── main.py
 │   ├── routes/
-│   │   ├── webhook.py
-│   │   └── chat.py
+│   │   ├── chat.py
+│   │   └── webhook_evolution.py
 │   └── schemas/
-│       └── message.py
+│       └── chat.py
 │
-├── bot/                              # processamento das mensagens
-│   └── message_processor.py
+├── agent/                            # agente de IA
+│   ├── model.py
+│   ├── processor.py
+│   └── prompt.py
 │
-├── services/                         # integrações externas e regras
-│   ├── agent.py
-│   ├── evolution.py
-│   └── openai.py
+├── integrations/
+│   └── evolution/                    # integração com a Evolution API
+│       ├── client.py
+│       └── parser.py
 │
 ├── database/                         # persistência e modelos
 │   ├── connection.py
@@ -124,7 +113,7 @@ whatsapp-ai-agent/
 │   ├── conftest.py
 │   ├── test_agent.py
 │   ├── test_conversations.py
-│   ├── test_message_processor.py
+│   ├── test_evolution_parser.py
 │   ├── test_routes.py
 │   └── test_users.py
 │
@@ -150,6 +139,7 @@ whatsapp-ai-agent/
 
 * Python 3.12
 * FastAPI
+* LangChain
 * OpenAI API
 * Evolution API
 * SQLAlchemy
@@ -174,6 +164,8 @@ data/
 └── conversations.db
 ```
 
+> As tabelas são criadas automaticamente na inicialização (`create_all`), que **não altera** tabelas já existentes. Ao mudar o schema em `database/models.py`, apague `data/conversations.db` (ou aplique a migração manualmente) em ambiente de desenvolvimento.
+
 ---
 
 # Tabelas
@@ -197,7 +189,7 @@ data/
 | user_id      | Usuário relacionado                           |
 | role         | Origem da mensagem (`user` ou `assistant`) |
 | content      | Conteúdo da mensagem                          |
-| message_type | Tipo da mensagem                              |
+| message_type | Tipo da mensagem                               |
 | sent_at      | Data e hora da mensagem                        |
 
 ---
@@ -219,7 +211,7 @@ python -m venv venv
 
 source venv/bin/activate            # linux/mac
 
-# venv/scripts/activate             # Windows
+# venv\Scripts\activate             # Windows
 
 pip install -r requirements.txt
 ```
@@ -228,7 +220,7 @@ pip install -r requirements.txt
 
 # Configuração
 
-Renomeie o `env.example` para `.env` e preencha:
+Renomeie o `.env.example` para `.env` e preencha:
 
 ```env
 OPENAI_API_KEY=sua_chave
@@ -236,17 +228,21 @@ BASE_URL=http://seu-servidor-evolution:8080
 INSTANCE=nome_da_instancia
 API_KEY_EVO=sua_api_key
 LOG_LEVEL=INFO
+AI_PROVIDER=openai
+AI_MODEL=gpt-5.4-nano
 ```
 
 ## Variáveis de ambiente
 
-| Variável      | Descrição                              |
-| -------------- | ---------------------------------------- |
-| OPENAI_API_KEY | Chave da OpenAI                          |
-| BASE_URL       | Endereço da Evolution API               |
-| INSTANCE       | Nome da instância do WhatsApp           |
-| API_KEY_EVO    | Chave de autenticação da Evolution API |
-| LOG_LEVEL      | Nível de log (`INFO`, `DEBUG`...)   |
+| Variável      | Descrição                                      |
+| -------------- | ------------------------------------------------ |
+| OPENAI_API_KEY | Chave da OpenAI                                  |
+| BASE_URL       | Endereço da Evolution API                       |
+| INSTANCE       | Nome da instância do WhatsApp                   |
+| API_KEY_EVO    | Chave de autenticação da Evolution API         |
+| LOG_LEVEL      | Nível de log (`INFO`, `DEBUG`...)           |
+| AI_PROVIDER    | Provedor do modelo (opcional, padrão`openai`) |
+| AI_MODEL       | Modelo utilizado (opcional, padrão`gpt-5.4-nano`)    |
 
 ---
 
@@ -272,10 +268,10 @@ python -m pytest -v
 
 # Próximos passos
 
-* Dockerização da aplicação
-* Migração para PostgreSQL
-* Dashboard administrativo
 * RAG com documentos
+* Migração para PostgreSQL
+* Dockerização da aplicação
+* Dashboard administrativo
 * Suporte a múltiplos modelos de IA
 * Memória de longo prazo
 

@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from database.connection import Base
@@ -10,7 +10,6 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=True)
     number = Column(String, unique=True, nullable=False, index=True)
-    history_imported = Column(Boolean, default=False, nullable=False)
 
     messages = relationship(
         "Message",

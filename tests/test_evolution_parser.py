@@ -2,8 +2,7 @@ import pytest
 
 from integrations.evolution.parser import (
     extract_webhook_message,
-    handle_audio,
-    handle_image,
+    handle_extended_text,
     handle_message_type,
     handle_text,
     normalize_message,
@@ -19,6 +18,7 @@ def make_raw_message():
     Uso:
         raw_message = make_raw_message()
         raw_message = make_raw_message(remote_jid_alt="123456789@s.whatsapp.net")
+        raw_message = make_raw_message(message_type="extendedTextMessage")
     """
 
     def _make(
@@ -31,9 +31,12 @@ def make_raw_message():
         message_type="conversation",
         content="Oi, tudo bem?",
     ):
-        message_body = (
-            {"conversation": content} if message_type == "conversation" else {}
-        )
+        if message_type == "conversation":
+            message_body = {"conversation": content}
+        elif message_type == "extendedTextMessage":
+            message_body = {"extendedTextMessage": {"text": content}}
+        else:
+            message_body = {}
 
         return {
             "key": {
@@ -109,10 +112,10 @@ def test_extract_accepts_valid_private_message(make_raw_message):
     assert extract_webhook_message(payload) == raw_message
 
 
-# handle_text / handle_image / handle_audio / handle_message_type
+# handle_text / handle_extended_text / handle_message_type
 #
-# handle_message_type olha o campo "messageType" e chama o handler correspondente no dicionário MESSAGE_TYPE_HANDLERS.
-# Cada handler individual sabe extrair (ou simular) o conteúdo daquele tipo específico.
+# Apenas mensagens de texto são suportadas ("conversation" e
+# "extendedTextMessage"). Qualquer outro tipo resulta em content=None.
 
 
 def test_handle_text_extracts_conversation_field():
@@ -130,48 +133,66 @@ def test_handle_text_missing_message_returns_none():
     assert handle_text({}) is None
 
 
-def test_handle_image_returns_placeholder():
+def test_handle_extended_text_extracts_text():
     """
-    Mensagens de imagem retornam um placeholder enquanto não há processamento.
+    Texto com link ou resposta (reply) armazena o conteúdo em 'message.extendedTextMessage.text'.
     """
-    assert handle_image({}) == "[Imagem enviada pelo usuário]"
+    raw_message = {"message": {"extendedTextMessage": {"text": "veja https://x.com"}}}
+    assert handle_extended_text(raw_message) == "veja https://x.com"
 
 
-def test_handle_audio_returns_placeholder():
+def test_handle_extended_text_missing_message_returns_none():
     """
-    Mensagens de áudio retornam um placeholder enquanto não há transcrição.
+    Sem o campo 'message' (ou sem 'extendedTextMessage'), retorna None.
     """
-    assert handle_audio({}) == "[Áudio enviado pelo usuário]"
+    assert handle_extended_text({}) is None
+    assert handle_extended_text({"message": {}}) is None
+
+
+@pytest.mark.parametrize("message_type", ["conversation", "extendedTextMessage"])
+def test_handle_message_type_text_types(make_raw_message, message_type):
+    """
+    Os tipos de texto suportados devem ser encaminhados ao handler correspondente.
+    """
+    raw_message = make_raw_message(message_type=message_type, content="teste")
+    assert handle_message_type(raw_message) == (message_type, "teste")
+
+
+def test_handle_message_type_strips_whitespace(make_raw_message):
+    """
+    Espaços no início e no fim do texto são removidos.
+    """
+    raw_message = make_raw_message(content="  oi  ")
+    assert handle_message_type(raw_message) == ("conversation", "oi")
 
 
 @pytest.mark.parametrize(
-    "message_type, expected_content",
+    "message_type",
     [
-        ("conversation", "teste"),
-        ("imageMessage", "[Imagem enviada pelo usuário]"),
-        ("audioMessage", "[Áudio enviado pelo usuário]"),
+        "imageMessage",
+        "audioMessage",
+        "stickerMessage",
+        "reactionMessage",
+        "protocolMessage",
     ],
 )
-def test_handle_message_type_known_types(
-    make_raw_message, message_type, expected_content
+def test_handle_message_type_unsupported_returns_none_content(
+    make_raw_message, message_type
 ):
     """
-    Cada tipo de mensagem conhecido deve ser encaminhado ao handler correspondente.
+    Tipos que não são texto retornam content=None, sem placeholder para o LLM.
     """
-    raw_message = make_raw_message(message_type=message_type, content="teste")
-    result_type, content = handle_message_type(raw_message)
-    assert result_type == message_type
-    assert content == expected_content
+    raw_message = make_raw_message(message_type=message_type)
+    assert handle_message_type(raw_message) == (message_type, None)
 
 
-def test_handle_message_type_unknown_type_uses_fallback(make_raw_message):
+@pytest.mark.parametrize("content", [None, "", "   "])
+def test_handle_message_type_empty_text_returns_none_content(make_raw_message, content):
     """
-    Tipos desconhecidos devem utilizar o fallback sem interromper o processamento.
+    Texto ausente, vazio ou só com espaços não tem conteúdo útil.
     """
-    raw_message = make_raw_message(message_type="stickerMessage")
-    result_type, content = handle_message_type(raw_message)
-    assert result_type == "stickerMessage"
-    assert content == "[Mensagem do tipo: stickerMessage]"
+    raw_message = make_raw_message(content=content)
+    assert handle_message_type(raw_message) == ("conversation", None)
 
 
 # normalize_phone
@@ -204,6 +225,7 @@ def test_normalize_phone_no_suffix_returns_same_value():
 #
 # Converte um raw_message da Evolution API para o formato
 # padronizado utilizado pelo restante da aplicação.
+# Retorna None para mensagens que não são texto.
 
 
 def test_normalize_message_prefers_remote_jid_alt(make_raw_message):
@@ -244,3 +266,44 @@ def test_normalize_message_builds_expected_dict(make_raw_message):
         "message_type": "conversation",
         "timestamp": 1710000000,
     }
+
+
+def test_normalize_message_extended_text(make_raw_message):
+    """
+    Texto com link/resposta (extendedTextMessage) é normalizado normalmente.
+    """
+    raw_message = make_raw_message(
+        message_type="extendedTextMessage", content="veja https://x.com"
+    )
+
+    result = normalize_message(raw_message)
+
+    assert result["content"] == "veja https://x.com"
+    assert result["message_type"] == "extendedTextMessage"
+
+
+@pytest.mark.parametrize(
+    "message_type",
+    [
+        "imageMessage",
+        "audioMessage",
+        "stickerMessage",
+        "reactionMessage",
+        "protocolMessage",
+    ],
+)
+def test_normalize_message_ignores_non_text(make_raw_message, message_type):
+    """
+    Mensagens que não são texto são ignoradas e nunca chegam ao LLM.
+    """
+    raw_message = make_raw_message(message_type=message_type)
+    assert normalize_message(raw_message) is None
+
+
+@pytest.mark.parametrize("content", [None, "", "   "])
+def test_normalize_message_ignores_empty_text(make_raw_message, content):
+    """
+    Texto vazio ou só com espaços é ignorado.
+    """
+    raw_message = make_raw_message(content=content)
+    assert normalize_message(raw_message) is None

@@ -5,7 +5,6 @@ from typing import Any
 from agent.model import generate_response
 from database.conversations import get_message_history, save_message
 from database.users import get_or_create_user
-from integrations.evolution.history import ensure_history
 
 logger = logging.getLogger(__name__)
 
@@ -24,38 +23,31 @@ def process_conversation(msg: dict[str, Any]) -> str:
     Returns:
         Texto da resposta gerada pela IA.
     """
+
     start = time.monotonic()
     number = msg["number"]
 
-    logger.info(
-        "Processando mensagem recebida | number=%s",
-        number,
-    )
+    logger.info("Processando mensagem recebida | number=%s", number)
 
-    user_id = get_or_create_user(
-        number=number,
-        name=msg["push_name"],
-    )
+    user_id = get_or_create_user(number=number, name=msg["push_name"])
 
-    ensure_history(user_id)
-
-    save_message(**msg)
+    if not save_message(**msg):
+        logger.warning(
+            "Mensagem não processada | number=%s | message_id=%s",
+            number,
+            msg["message_id"],
+        )
+        return
 
     history = get_message_history(user_id)
 
-    logger.debug(
-        "Solicitando resposta da IA | number=%s",
-        number,
-    )
+    logger.debug("Solicitando resposta da IA | number=%s", number)
 
     try:
         response = generate_response(history)
 
     except Exception:
-        logger.exception(
-            "Falha ao gerar resposta da IA | number=%s",
-            number,
-        )
+        logger.exception("Falha ao gerar resposta da IA | number=%s", number)
         response = ERROR_MESSAGE
 
     save_message(
@@ -68,9 +60,7 @@ def process_conversation(msg: dict[str, Any]) -> str:
     elapsed = time.monotonic() - start
 
     logger.info(
-        "Processamento da conversa concluído | number=%s | tempo=%.2fs",
-        number,
-        elapsed,
+        "Processamento da conversa concluído | number=%s | tempo=%.2fs", number, elapsed
     )
 
     return response
