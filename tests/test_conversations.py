@@ -1,292 +1,73 @@
-from datetime import datetime
-from zoneinfo import ZoneInfo
-
 from database.conversations import (
-    TIMEZONE,
-    add_message,
     get_message_history,
-    save_message,
-    timestamp_to_datetime,
+    message_exists,
+    save_exchange,
 )
 from database.models import Message, User
-from database.users import _get_or_create_user
 
 
-# A criação de usuários possui testes próprios em test_users.py.
-def _create_user(db_session, number="5511999999999", name="Fulano"):
-    user = _get_or_create_user(db_session, number, name)
-    db_session.commit()
-    return user
+def _msg(**o):
+    base = {
+        "number": "5511999999999",
+        "push_name": "Fulano",
+        "content": "oi",
+        "message_type": "conversation",
+        "message_id": "M1",
+        "timestamp": None,
+    }
+    base.update(o)
+    return base
 
 
-def test_add_message_inserts_new_message(db_session):
-    """
-    Adiciona uma nova mensagem quando o message_id é único.
-    """
-    user = _create_user(db_session)
+def test_save_exchange_is_atomic(db_session):
+    assert save_exchange(_msg(), "olá") is True
+    assert save_exchange(_msg(), "olá de novo") is False  # mesmo message_id
 
-    add_message(
-        session=db_session,
-        user=user,
-        message_id="MSG1",
-        role="user",
-        content="oi",
-        message_type="conversation",
-        sent_at=datetime.now(TIMEZONE),
-    )
-    db_session.commit()
-
-    saved = db_session.query(Message).filter_by(message_id="MSG1").one()
-
-    assert saved.content == "oi"
-    assert saved.user_id == user.id
+    roles = [m.role for m in db_session.query(Message).order_by(Message.id)]
+    assert roles == ["user", "assistant"]  # a segunda tentativa não deixou lixo
 
 
-def test_add_message_ignores_duplicate(db_session):
-    """
-    Ignora mensagens que possuem o mesmo message_id.
-    """
-    user = _create_user(db_session)
-
-    for content in ["primeira", "segunda (duplicada)"]:
-        add_message(
-            session=db_session,
-            user=user,
-            message_id="MSG-DUP",
-            role="user",
-            content=content,
-            message_type="conversation",
-            sent_at=datetime.now(TIMEZONE),
-        )
-        db_session.commit()
-
-    count = db_session.query(Message).filter_by(message_id="MSG-DUP").count()
-
-    assert count == 1
-
-    saved = db_session.query(Message).filter_by(message_id="MSG-DUP").one()
-
-    assert saved.content == "primeira"
-
-
-def test_timestamp_to_datetime():
-    """
-    Converte timestamp Unix para datetime com timezone.
-    """
-    result = timestamp_to_datetime(1710000000)
-
-    assert isinstance(result, datetime)
-    assert result.tzinfo is not None
-
-    assert result == datetime.fromtimestamp(
-        1710000000,
-        tz=ZoneInfo("America/Sao_Paulo"),
-    )
-
-
-def test_timestamp_keeps_datetime():
-    """
-    Mantém datetime existente sem modificar.
-    """
-    now = datetime.now(TIMEZONE)
-
-    assert timestamp_to_datetime(now) is now
-
-
-def test_save_message_creates_user(db_session):
-    """
-    Cria usuário automaticamente ao salvar mensagem.
-    """
-    save_message(
-        number="5511977777777",
-        push_name="Novo Contato",
-        from_me=False,
-        content="primeira mensagem",
-        message_id="MSG-NEW-USER",
-    )
+def test_save_exchange_creates_user(db_session):
+    save_exchange(_msg(number="5511977777777", push_name="Novo"), "olá")
 
     user = db_session.query(User).filter_by(number="5511977777777").one()
-
-    assert user.name == "Novo Contato"
-
-    message = db_session.query(Message).filter_by(message_id="MSG-NEW-USER").one()
-
-    assert message.role == "user"
-    assert message.content == "primeira mensagem"
+    assert user.name == "Novo"
 
 
-def test_save_message_default_timestamp(db_session):
-    """
-    Gera data automaticamente quando timestamp não é informado.
-    """
-    save_message(
-        number="5511988888888",
-        push_name="Contato",
-        from_me=False,
-        content="mensagem sem timestamp",
-        message_id="MSG-NO-TIMESTAMP",
-    )
-
-    message = db_session.query(Message).filter_by(message_id="MSG-NO-TIMESTAMP").one()
-
-    assert message.sent_at is not None
+def test_message_exists(db_session):
+    assert message_exists("M1") is False
+    save_exchange(_msg(), "olá")
+    assert message_exists("M1") is True
 
 
-def test_save_message_bot_role(db_session):
-    """
-    Define role assistant para mensagens enviadas pelo bot.
-    """
-    save_message(
-        number="5511977777777",
-        push_name="Novo Contato",
-        from_me=True,
-        content="resposta do bot",
-        message_id="MSG-BOT-REPLY",
-    )
-
-    message = db_session.query(Message).filter_by(message_id="MSG-BOT-REPLY").one()
-
-    assert message.role == "assistant"
+def test_message_exists_none_is_false(db_session):
+    assert message_exists(None) is False
 
 
-def test_save_message_generates_id(db_session):
-    """
-    Gera identificador quando message_id não é informado.
-    """
-    save_message(
-        number="5511966666666",
-        push_name="Alguém",
-        from_me=True,
-        content="resposta sem id externo",
-    )
+def test_history_follows_insertion_order(db_session):
+    save_exchange(_msg(message_id="M1", content="primeira"), "r1")
+    save_exchange(_msg(message_id="M2", content="segunda"), "r2")
 
-    message = (
-        db_session.query(Message).filter_by(content="resposta sem id externo").one()
-    )
-
-    assert message.message_id is not None
-    assert message.message_id != ""
-
-
-def test_history_order(db_session):
-    """
-    Retorna mensagens na ordem real (cronológica) da conversa.
-    """
-    user = _create_user(db_session)
-
-    add_message(
-        session=db_session,
-        user=user,
-        message_id="M2",
-        role="user",
-        content="segunda",
-        message_type="conversation",
-        sent_at=datetime(
-            2024,
-            1,
-            2,
-            tzinfo=TIMEZONE,
-        ),
-    )
-
-    add_message(
-        session=db_session,
-        user=user,
-        message_id="M1",
-        role="user",
-        content="primeira",
-        message_type="conversation",
-        sent_at=datetime(
-            2024,
-            1,
-            1,
-            tzinfo=TIMEZONE,
-        ),
-    )
-
-    db_session.commit()
-
+    user = db_session.query(User).one()
     history = get_message_history(user.id)
 
-    assert [message["content"] for message in history] == [
-        "primeira",
-        "segunda",
-    ]
+    assert [m["content"] for m in history] == ["primeira", "r1", "segunda", "r2"]
 
 
-def test_get_message_history_respects_limit(db_session):
-    """
-    Retorna apenas a quantidade limite de mensagens.
-    """
-    user = _create_user(db_session)
+def test_history_respects_limit(db_session):
+    for i in range(3):
+        save_exchange(_msg(message_id=f"M{i}", content=f"msg{i}"), f"r{i}")
 
-    for i in range(5):
-        add_message(
-            session=db_session,
-            user=user,
-            message_id=f"M{i}",
-            role="user",
-            content=f"msg{i}",
-            message_type="conversation",
-            sent_at=datetime(
-                2024,
-                1,
-                i + 1,
-                tzinfo=TIMEZONE,
-            ),
-        )
+    user = db_session.query(User).one()
+    history = get_message_history(user.id, limit=2)
 
-    db_session.commit()
-
-    history = get_message_history(
-        user.id,
-        limit=2,
-    )
-
-    assert len(history) == 2
-
-    assert [message["content"] for message in history] == [
-        "msg3",
-        "msg4",
-    ]
+    assert [m["content"] for m in history] == ["msg2", "r2"]
 
 
 def test_empty_history(db_session):
-    """
-    Retorna lista vazia quando usuário não possui histórico.
-    """
-    user = _create_user(db_session)
-
-    history = get_message_history(user.id)
-
-    assert history == []
-
-
-def test_history_content_has_no_timestamp(db_session):
-    """
-    O conteúdo do histórico é enviado sem prefixo de data.
-    """
-    user = _create_user(db_session)
-
-    add_message(
-        session=db_session,
-        user=user,
-        message_id="M1",
-        role="user",
-        content="oi",
-        message_type="conversation",
-        sent_at=datetime(
-            2024,
-            3,
-            5,
-            14,
-            30,
-            tzinfo=TIMEZONE,
-        ),
-    )
-
+    save_exchange(_msg(number="5511900000000"), "olá")
+    other = db_session.query(User).filter_by(number="5511900000000").one()
+    db_session.query(Message).delete()
     db_session.commit()
 
-    history = get_message_history(user.id)
-
-    assert history[0] == {"role": "user", "content": "oi"}
+    assert get_message_history(other.id) == []

@@ -18,7 +18,7 @@ O `ngrok` é utilizado apenas para expor temporariamente uma aplicação local. 
 
 # Fluxo de desenvolvimento
 
-```text id="jeb07h"
+```text
 WhatsApp
     │
     ▼
@@ -46,25 +46,25 @@ uvicorn app.main:app --reload
 
 A documentação da API estará disponível em:
 
-```text id="qz54cg"
+```text
 http://localhost:8000/docs
 ```
 
 ## Terminal 2 — criar um túnel público com o ngrok
 
-```bash 
+```bash
 ngrok http 8000
 ```
 
 O ngrok irá gerar uma URL pública semelhante a:
 
-```text 
+```text
 https://xxxx.ngrok-free.app
 ```
 
 Configure essa URL como webhook na Evolution API:
 
-```text 
+```text
 https://xxxx.ngrok-free.app/webhook/
 ```
 
@@ -78,7 +78,7 @@ O projeto utiliza SQLite durante o desenvolvimento por ser simples de configurar
 
 O banco é armazenado localmente em:
 
-```text 
+```text
 data/
 └── conversations.db
 ```
@@ -87,7 +87,7 @@ As tabelas são criadas automaticamente ao iniciar a aplicação. O processo ape
 
 Ao alterar o schema em `database/models.py`, recrie o banco:
 
-```bash 
+```bash
 rm data/conversations.db
 ```
 

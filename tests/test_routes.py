@@ -21,48 +21,36 @@ def client():
 
 @pytest.fixture
 def mock_chat_dependencies(monkeypatch):
-    """Mocka dependências da rota chat (a rota não envia pelo WhatsApp)."""
     calls = []
 
-    def fake_process_conversation(message):
+    def fake_process_conversation(message, send):
         calls.append(("process_conversation", message))
-        return "resposta simulada"
+        send("resposta simulada")
+        return "processed"
 
     monkeypatch.setattr(chat_module, "process_conversation", fake_process_conversation)
-
     return calls
 
 
 @pytest.fixture
 def mock_webhook_dependencies(monkeypatch):
-    """Mocka dependências da rota webhook."""
     calls = []
 
-    def fake_process_conversation(message):
+    def fake_process_conversation(message, send):
         calls.append(("process_conversation", message))
-        return "resposta simulada"
+        send("resposta simulada")
+        return "processed"
 
     def fake_send_message(number, text):
-        calls.append(
-            (
-                "send_message",
-                {
-                    "number": number,
-                    "text": text,
-                },
-            )
-        )
-
+        calls.append(("send_message", {"number": number, "text": text}))
         return {"status": "ok"}
 
     monkeypatch.setattr(
         webhook_module, "process_conversation", fake_process_conversation
     )
-
     monkeypatch.setattr(
         webhook_module.evolution_service, "send_message", fake_send_message
     )
-
     return calls
 
 
@@ -81,7 +69,10 @@ def test_chat_returns_response(client, mock_chat_dependencies):
     )
 
     assert response.status_code == 200
-    assert response.json() == {"response": "resposta simulada"}
+    assert response.json() == {
+        "response": "resposta simulada",
+        "status": "processed",
+    }
 
 
 def test_chat_builds_message(client, mock_chat_dependencies):
@@ -231,7 +222,6 @@ def test_webhook_ignores_invalid_message(
     client, mock_webhook_dependencies, monkeypatch
 ):
     """Ignora mensagem não normalizada."""
-
     monkeypatch.setattr(webhook_module, "normalize_message", lambda x: None)
 
     response = client.post("/webhook/", json=_payload())
@@ -257,7 +247,12 @@ def test_webhook_duplicate_does_not_send(
     client, mock_webhook_dependencies, monkeypatch
 ):
     """Mensagem duplicada retorna 200 e não tenta enviar nada."""
-    monkeypatch.setattr(webhook_module, "process_conversation", lambda msg: None)
+
+    monkeypatch.setattr(
+        webhook_module,
+        "process_conversation",
+        lambda msg, send: "duplicate",
+    )
 
     response = client.post("/webhook/", json=_payload())
 

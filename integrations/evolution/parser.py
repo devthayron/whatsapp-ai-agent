@@ -4,8 +4,8 @@ logger = logging.getLogger(__name__)
 
 
 def extract_webhook_message(payload):
-
     event = payload.get("event")
+
     # Processa apenas novas mensagens recebidas
     if event != "messages.upsert":
         logger.debug("Evento de webhook ignorado | event=%s", event)
@@ -23,14 +23,16 @@ def extract_webhook_message(payload):
     # Ignora mensagens enviadas pelo próprio bot
     if key.get("fromMe"):
         logger.debug(
-            "Mensagem ignorada (enviada pelo próprio bot) | remote_jid=%s", remote_jid
+            "Mensagem ignorada (enviada pelo próprio bot) | remote_jid=%s",
+            remote_jid,
         )
         return None
 
     # Responde apenas mensagens no contato privado
     if not remote_jid.endswith("@s.whatsapp.net"):
         logger.debug(
-            "Mensagem ignorada | motivo=chat não individual | remote_jid=%s", remote_jid
+            "Mensagem ignorada | motivo=chat não individual | remote_jid=%s",
+            remote_jid,
         )
         return None
 
@@ -39,15 +41,19 @@ def extract_webhook_message(payload):
 
 def handle_text(raw_message):
     """Texto simples."""
-    return raw_message.get("message", {}).get("conversation")
+    content = raw_message.get("message", {}).get("conversation")
+
+    return "text", content
 
 
 def handle_extended_text(raw_message):
     """Texto com link, resposta (reply) ou preview."""
-    return raw_message.get("message", {}).get("extendedTextMessage", {}).get("text")
+    content = raw_message.get("message", {}).get("extendedTextMessage", {}).get("text")
+
+    return "text", content
 
 
-# Apenas tipos de texto são suportados. Qualquer outro tipo é ignorado.
+# Tipos de mensagem da Evolution → handlers da aplicação
 MESSAGE_TYPE_HANDLERS = {
     "conversation": handle_text,
     "extendedTextMessage": handle_extended_text,
@@ -56,8 +62,9 @@ MESSAGE_TYPE_HANDLERS = {
 
 def handle_message_type(raw_message):
     """
-    Retorna (message_type, content).
+    Retorna (content_type, content).
 
+    content_type é o tipo definido pela aplicação.
     content é None quando o tipo não é suportado ou não há texto.
     """
     message_type = raw_message.get("messageType")
@@ -65,19 +72,21 @@ def handle_message_type(raw_message):
     handler = MESSAGE_TYPE_HANDLERS.get(message_type)
 
     if handler is None:
-        logger.debug("Tipo de mensagem ignorado | message_type=%s", message_type)
-        return message_type, None
+        logger.debug(
+            "Tipo de mensagem ignorado | message_type=%s",
+            message_type,
+        )
+        return None, None
 
-    content = handler(raw_message)
+    content_type, content = handler(raw_message)
 
     if not isinstance(content, str) or not content.strip():
-        return message_type, None
+        return content_type, None
 
-    return message_type, content.strip()
+    return content_type, content.strip()
 
 
 def normalize_phone(number: str | None) -> str | None:
-
     if number is None:
         return None
 
@@ -85,41 +94,40 @@ def normalize_phone(number: str | None) -> str | None:
 
 
 def normalize_message(raw_message):
-
     key = raw_message.get("key", {})
+
+    # ID da mensagem fornecido pelo serviço externo
     message_id = key.get("id")
-    from_me = key.get("fromMe")
+
     remote_jid = key.get("remoteJid")
     remote_jid_alt = key.get("remoteJidAlt")
     timestamp = raw_message.get("messageTimestamp")
     push_name = raw_message.get("pushName")
 
-    # Extrai o conteúdo; só mensagens de texto passam.
-    message_type, content = handle_message_type(raw_message)
+    content_type, content = handle_message_type(raw_message)
 
     if content is None:
         logger.debug(
-            "Mensagem ignorada | motivo=não é texto | message_type=%s | message_id=%s",
-            message_type,
+            "Mensagem ignorada | motivo=não é texto | content_type=%s | message_id=%s",
+            content_type,
             message_id,
         )
         return None
 
-    # Número do contato da conversa
     number = normalize_phone(remote_jid_alt or remote_jid)
 
     if not number:
         logger.warning(
-            "Mensagem sem número identificável, ignorada | message_id=%s", message_id
+            "Mensagem sem número identificável, ignorada | message_id=%s",
+            message_id,
         )
         return None
 
     return {
-        "message_id": message_id,
-        "from_me": from_me,
+        "external_id": message_id,
         "number": number,
         "push_name": push_name,
         "content": content,
-        "message_type": message_type,
+        "content_type": content_type,
         "timestamp": timestamp,
     }

@@ -1,242 +1,102 @@
 import pytest
 
-import agent.processor as agent_module
-from agent.processor import process_conversation
-
-
-@pytest.fixture
-def mock_dependencies(monkeypatch):
-    """Mocka dependências externas e registra chamadas."""
-    calls = []
-
-    def fake_get_or_create_user(number, name):
-        calls.append(("get_or_create_user", {"number": number, "name": name}))
-        return 42
-
-    def fake_save_message(**kwargs):
-        calls.append(("save_message", kwargs))
-        return True
-
-    def fake_get_message_history(user_id):
-        calls.append(("get_message_history", {"user_id": user_id}))
-        return [
-            {
-                "role": "user",
-                "content": "oi",
-            }
-        ]
-
-    def fake_generate_response(history):
-        calls.append(("generate_response", {"history": history}))
-        return "resposta gerada pela IA"
-
-    monkeypatch.setattr(
-        agent_module,
-        "get_or_create_user",
-        fake_get_or_create_user,
-    )
-    monkeypatch.setattr(
-        agent_module,
-        "save_message",
-        fake_save_message,
-    )
-    monkeypatch.setattr(
-        agent_module,
-        "get_message_history",
-        fake_get_message_history,
-    )
-    monkeypatch.setattr(
-        agent_module,
-        "generate_response",
-        fake_generate_response,
-    )
-
-    return calls
+import agent.processor as proc
+from agent.processor import ERROR_MESSAGE, process_conversation
+from database.models import Message
 
 
 def _msg(**overrides):
-    """Cria mensagem padrão de teste."""
     base = {
         "number": "5511999999999",
         "push_name": "Fulano",
         "from_me": False,
         "content": "Olá, tudo bem?",
-        "message_type": "chat",
+        "message_type": "conversation",
         "message_id": "MSG1",
         "timestamp": None,
     }
-
     base.update(overrides)
-
     return base
 
 
-# Fluxo normal
+@pytest.fixture
+def ai(monkeypatch):
+    """Substitui a IA e registra o histórico recebido."""
+    received = []
+
+    def fake(history):
+        received.append(list(history))
+        return "resposta da IA"
+
+    monkeypatch.setattr(proc, "generate_response", fake)
+    return received
 
 
-def test_process_flow_order(mock_dependencies):
-    """Valida ordem do processamento."""
-    process_conversation(_msg())
-
-    steps = [call[0] for call in mock_dependencies]
-
-    assert steps == [
-        "get_or_create_user",
-        "save_message",
-        "get_message_history",
-        "generate_response",
-        "save_message",
-    ]
+def _roles(db_session):
+    return [m.role for m in db_session.query(Message).order_by(Message.id)]
 
 
-def test_returns_ai_response(mock_dependencies):
-    """Retorna resposta da IA."""
-    result = process_conversation(_msg())
+def test_success_sends_and_saves_both(db_session, ai):
+    sent = []
 
-    assert result == "resposta gerada pela IA"
+    assert process_conversation(_msg(), send=sent.append) == "processed"
 
-
-def test_creates_user_with_data(mock_dependencies):
-    """Cria usuário com dados recebidos."""
-    process_conversation(
-        _msg(
-            number="5511988888888",
-            push_name="Ciclana",
-        )
-    )
-
-    call = next(c for c in mock_dependencies if c[0] == "get_or_create_user")
-
-    assert call[1] == {
-        "number": "5511988888888",
-        "name": "Ciclana",
-    }
+    assert sent == ["resposta da IA"]
+    assert _roles(db_session) == ["user", "assistant"]
 
 
-def test_saves_user_message(mock_dependencies):
-    """Salva mensagem recebida."""
-    msg = _msg()
+def test_ai_receives_current_message(db_session, ai):
+    process_conversation(_msg(content="oi"), send=lambda t: None)
 
-    process_conversation(msg)
-
-    call = [c for c in mock_dependencies if c[0] == "save_message"][0]
-
-    assert call[1] == msg
+    assert ai[0][-1] == {"role": "user", "content": "oi"}
 
 
-def test_saves_ai_message(mock_dependencies):
-    """Salva resposta da IA."""
-    process_conversation(
-        _msg(
-            number="5511977777777",
-            push_name="Beltrano",
-        )
-    )
+def test_history_includes_previous_exchange(db_session, ai):
+    process_conversation(_msg(message_id="M1", content="primeira"), send=lambda t: None)
+    process_conversation(_msg(message_id="M2", content="segunda"), send=lambda t: None)
 
-    calls = [c for c in mock_dependencies if c[0] == "save_message"]
-
-    reply = calls[1][1]
-
-    assert reply["number"] == "5511977777777"
-    assert reply["push_name"] == "Beltrano"
-    assert reply["from_me"] is True
-    assert reply["content"] == "resposta gerada pela IA"
+    assert [m["content"] for m in ai[1]] == ["primeira", "resposta da IA", "segunda"]
 
 
-def test_sends_history_to_ai(mock_dependencies):
-    """Envia histórico salvo para IA."""
-    process_conversation(_msg())
-
-    call = next(c for c in mock_dependencies if c[0] == "generate_response")
-
-    assert call[1]["history"] == [
-        {
-            "role": "user",
-            "content": "oi",
-        }
-    ]
-
-
-# Mensagem duplicada
-
-
-def test_duplicate_message_returns_none(mock_dependencies, monkeypatch):
-    """Mensagem duplicada não é respondida."""
-    monkeypatch.setattr(agent_module, "save_message", lambda **kwargs: False)
-
-    assert process_conversation(_msg()) is None
-
-
-def test_duplicate_message_does_not_call_ai(mock_dependencies, monkeypatch):
-    """Mensagem duplicada não chama a IA nem busca histórico."""
-    monkeypatch.setattr(agent_module, "save_message", lambda **kwargs: False)
-
-    process_conversation(_msg())
-
-    steps = [call[0] for call in mock_dependencies]
-
-    assert "generate_response" not in steps
-    assert "get_message_history" not in steps
-
-
-# Falha da IA
-
-
-def test_ai_error_returns_fallback(mock_dependencies, monkeypatch):
-    """Retorna fallback quando IA falha."""
-
-    def raise_error(history):
+def test_ai_failure_sends_fallback_and_saves_nothing(db_session, monkeypatch):
+    def boom(history):
         raise ConnectionError()
 
-    monkeypatch.setattr(
-        agent_module,
-        "generate_response",
-        raise_error,
-    )
+    monkeypatch.setattr(proc, "generate_response", boom)
+    sent = []
 
-    result = process_conversation(_msg())
+    assert process_conversation(_msg(), send=sent.append) == "failed"
 
-    assert result == (
-        "Desculpe, não consegui processar sua mensagem agora. "
-        "Tente novamente em instantes."
-    )
+    assert sent == [ERROR_MESSAGE]
+    assert db_session.query(Message).count() == 0
 
 
-def test_ai_error_saves_fallback(mock_dependencies, monkeypatch):
-    """Salva fallback como resposta."""
+def test_send_failure_saves_nothing_and_retry_delivers(db_session, ai):
+    sent, attempts = [], {"n": 0}
 
-    def raise_error(history):
-        raise TimeoutError()
+    def flaky_send(text):
+        attempts["n"] += 1
+        if attempts["n"] == 1:
+            raise ConnectionError()
+        sent.append(text)
 
-    monkeypatch.setattr(
-        agent_module,
-        "generate_response",
-        raise_error,
-    )
+    with pytest.raises(ConnectionError):
+        process_conversation(_msg(), send=flaky_send)
 
-    process_conversation(_msg())
+    assert db_session.query(Message).count() == 0
 
-    calls = [c for c in mock_dependencies if c[0] == "save_message"]
+    assert process_conversation(_msg(), send=flaky_send) == "processed"
 
-    assert calls[1][1]["from_me"] is True
-    assert "Desculpe" in calls[1][1]["content"]
+    assert sent == ["resposta da IA"]
+    assert _roles(db_session) == ["user", "assistant"]
 
 
-def test_user_message_saved_before_ai(mock_dependencies, monkeypatch):
-    """Mantém mensagem salva antes da IA."""
+def test_duplicate_is_not_answered_again(db_session, ai):
+    sent = []
 
-    def raise_error(history):
-        raise RuntimeError()
+    process_conversation(_msg(), send=sent.append)
+    status = process_conversation(_msg(), send=sent.append)
 
-    monkeypatch.setattr(
-        agent_module,
-        "generate_response",
-        raise_error,
-    )
-
-    process_conversation(_msg())
-
-    calls = [c for c in mock_dependencies if c[0] == "save_message"]
-
-    assert len(calls) == 2
-    assert calls[0][1]["from_me"] is False
+    assert status == "duplicate"
+    assert sent == ["resposta da IA"]
+    assert len(ai) == 1

@@ -15,7 +15,7 @@ class User(Base):
         "Message",
         back_populates="user",
         cascade="all, delete-orphan",
-        order_by="Message.sent_at",
+        order_by="Message.id",
     )
 
 
@@ -23,10 +23,10 @@ class Message(Base):
     __tablename__ = "messages"
 
     id = Column(Integer, primary_key=True)
-    message_id = Column(String, unique=True, nullable=False, index=True)
+    external_id = Column(String, unique=True, nullable=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     role = Column(String, nullable=False)
     content = Column(String, nullable=False)
-    message_type = Column(String, nullable=False)
+    content_type = Column(String, nullable=False)
     sent_at = Column(DateTime, nullable=False, index=True)
     user = relationship("User", back_populates="messages")

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Body
 
 from agent.processor import process_conversation
 from integrations.evolution.client import evolution_service
@@ -8,25 +8,19 @@ router = APIRouter(prefix="/webhook", tags=["Webhook"])
 
 
 @router.post("/")
-async def webhook(request: Request):
-
-    payload = await request.json()
+def webhook(payload: dict = Body(...)):
 
     raw_message = extract_webhook_message(payload)
 
-    if not raw_message:
-        return {"status": "ignored"}
-
-    msg = normalize_message(raw_message)
+    msg = normalize_message(raw_message) if raw_message else None
 
     if not msg:
         return {"status": "ignored"}
 
-    response = process_conversation(msg)
+    # define a função de envio de mensagens para o Evolution
+    def send_msg(text):
+        return evolution_service.send_message(msg["number"], text)
 
-    if response is None:
-        return {"status": "duplicate"}
+    status = process_conversation(msg, send_msg)
 
-    evolution_service.send_message(number=msg["number"], text=response)
-
-    return {"status": "processed"}
+    return {"status": status}

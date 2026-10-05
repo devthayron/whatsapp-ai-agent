@@ -7,31 +7,32 @@ from app.schemas.chat import ChatRequest
 
 logger = logging.getLogger(__name__)
 
-
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
 @router.post("/")
 def chat(data: ChatRequest):
-
     message = {
         "number": data.number,
         "push_name": data.push_name,
-        "from_me": False,
+        "role": "user",
         "content": data.content,
-        "message_type": "chat",
-        "message_id": None,
+        "content_type": "text",
+        "external_id": None,
         "timestamp": None,
     }
 
-    response = process_conversation(message)
+    reply = []
 
-    # descomentar as linhas abaixo se quiser enviar a resposta via Evolution API
-    # try:
-    #     evolution_service.send_message(number=data.number, text=response)
-    # except Exception:
-    #     logger.exception(
-    #         "Falha ao enviar mensagem via Evolution API | number=%s", data.number
-    #     )
+    status = process_conversation(message, send=reply.append)
 
-    return {"response": response}
+    logger.info(
+        "Requisição de chat processada | number=%s | status=%s",
+        data.number,
+        status,
+    )
+
+    return {
+        "status": status,
+        "response": reply[0] if reply else None,
+    }

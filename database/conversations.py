@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime
-from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.exc import IntegrityError
@@ -15,128 +14,100 @@ TIMEZONE = ZoneInfo("America/Sao_Paulo")
 CONTEXT_MESSAGES_LIMIT = 30
 
 
-def add_message(
-    session,
-    user,
-    message_id,
-    role,
-    content,
-    message_type,
-    sent_at,
-):
-    exists = session.query(Message).filter_by(message_id=message_id).first()
-
-    if exists:
-        logger.debug(
-            "Mensagem duplicada ignorada | message_id=%s",
-            message_id,
-        )
-        return False
-
-    session.add(
-        Message(
-            message_id=message_id,
-            user_id=user.id,
-            role=role,
-            content=content,
-            message_type=message_type,
-            sent_at=sent_at,
-        )
-    )
-    return True
-
-
 def timestamp_to_datetime(timestamp):
     if isinstance(timestamp, (int, float)):
-        return datetime.fromtimestamp(
-            timestamp,
-            tz=TIMEZONE,
-        )
+        return datetime.fromtimestamp(timestamp, tz=TIMEZONE)
 
     return timestamp
 
 
-def save_message(
-    number,
-    push_name,
-    from_me,
-    content,
-    message_id=None,
-    message_type="conversation",
-    timestamp=None,
-):
-    message_id = message_id or str(uuid4())
-
-    if timestamp is None:
-        timestamp = datetime.now(TIMEZONE)
-
-    sent_at = timestamp_to_datetime(timestamp)
-    role = "assistant" if from_me else "user"
+def message_exists(external_id):
+    """Só leitura. Usado para descartar retries de mensagens já processadas."""
+    if not external_id:
+        return False
 
     with SessionLocal() as session:
-        user = _get_or_create_user(
-            session,
-            number,
-            push_name,
+        return (
+            session.query(Message.id).filter_by(external_id=external_id).first()
+            is not None
         )
 
-        saved = add_message(
-            session=session,
-            user=user,
-            message_id=message_id,
-            role=role,
-            content=content,
-            message_type=message_type,
-            sent_at=sent_at,
-        )
-        if not saved:
-            return False
 
+def save_conversation(msg, response):
+    """
+    Grava a mensagem do usuário e a resposta numa única transação:
+    ou entram as duas, ou nenhuma.
+    """
+    now = datetime.now(TIMEZONE)
+    sent_at = timestamp_to_datetime(msg["timestamp"] or now)
+
+    with SessionLocal() as session:
         try:
-            session.commit()
+            user = _get_or_create_user(session, msg["number"], msg["push_name"])
 
-            logger.debug(
-                "Mensagem salva | role=%s | number=%s | message_id=%s",
-                role,
-                number,
-                message_id,
+            session.add_all(
+                [
+                    Message(
+                        external_id=msg["external_id"],
+                        user_id=user.id,
+                        role="user",
+                        content=msg["content"],
+                        content_type=msg["content_type"],
+                        sent_at=sent_at,
+                    ),
+                    Message(
+                        external_id=None,
+                        user_id=user.id,
+                        role="assistant",
+                        content=response,
+                        content_type="text",
+                        sent_at=now,
+                    ),
+                ]
             )
+
+            session.commit()
 
         except IntegrityError:
             session.rollback()
-
-            logger.exception(
-                "Erro ao salvar mensagem | role=%s | number=%s | message_id=%s",
-                role,
-                number,
-                message_id,
+            logger.warning(
+                "Conversa não gravada (violação de unicidade) | "
+                "number=%s | external_id=%s",
+                msg["number"],
+                msg["external_id"],
             )
-
             return False
+
+    logger.debug(
+        "Conversa gravada | number=%s | external_id=%s",
+        msg["number"],
+        msg["external_id"],
+    )
 
     return True
 
 
 def get_message_history(user_id, limit=CONTEXT_MESSAGES_LIMIT):
     """
-    Retorna as últimas mensagens da conversa,
-    preservando a ordem cronológica.
+    Retorna as últimas mensagens da conversa em ordem cronológica.
+
+    A ordem vem do id autoincremental (ordem real de gravação).
     """
     with SessionLocal() as session:
         messages = (
             session.query(Message)
             .filter(Message.user_id == user_id)
-            .order_by(
-                Message.sent_at.desc(),
-                Message.id.desc(),
-            )
+            .order_by(Message.id.desc())
             .limit(limit)
             .all()
         )
 
         messages.reverse()
 
-        logger.debug("Histórico recuperado | total_messages=%s", len(messages))
+        logger.debug(
+            "Histórico recuperado | total_messages=%s",
+            len(messages),
+        )
 
         return [
             {
