@@ -8,4 +8,4 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 
 @router.post("/")
 def chat(message: MessageReceived):
-    return process_conversation(message)
+    return process_conversation(message, send_msg=None)

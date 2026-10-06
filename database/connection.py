@@ -1,14 +1,9 @@
-from pathlib import Path
-
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-DATA_DIR = Path("data")
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+from config import settings
 
-DATABASE_URL = f"sqlite:///{DATA_DIR / 'conversations.db'}"
-
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
 
 SessionLocal = sessionmaker(
     bind=engine, autoflush=False, autocommit=False, expire_on_commit=False

@@ -10,6 +10,8 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str
 
+    DATABASE_URL: str
+
     AI_PROVIDER: str = "openai"
     AI_MODEL: str = "gpt-5.4-nano"
 
@@ -23,7 +25,7 @@ class Settings(BaseSettings):
 
 
 @lru_cache
-def get_settings():
+def get_settings() -> Settings:
     return Settings()
 
 
