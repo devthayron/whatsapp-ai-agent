@@ -1,26 +1,42 @@
-from fastapi import APIRouter, Body
+import logging
+from typing import Annotated
+
+from fastapi import APIRouter, Body, Response
 
 from agent.processor import process_conversation
 from integrations.evolution.client import evolution_service
-from integrations.evolution.parser import extract_webhook_message, normalize_message
+from integrations.evolution.parser import (
+    extract_webhook_message,
+    normalize_message,
+)
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhook", tags=["Webhook"])
 
 
 @router.post("/")
-def webhook(payload: dict = Body(...)):
-
+def webhook(payload: Annotated[dict, Body()]):
     raw_message = extract_webhook_message(payload)
 
-    msg = normalize_message(raw_message) if raw_message else None
+    if not raw_message:
+        return Response(status_code=200)
 
-    if not msg:
-        return {"status": "ignored"}
+    message = normalize_message(raw_message)
 
-    # define a função de envio de mensagens para o Evolution
+    if not message:
+        return Response(status_code=200)
+
     def send_msg(text):
-        return evolution_service.send_message(msg["number"], text)
+        return evolution_service.send_message(message.number, text)
 
-    status = process_conversation(msg, send_msg)
+    try:
+        process_conversation(message, send_msg)
+    except Exception:
+        logger.exception(
+            "Erro inesperado ao processar webhook | number=%s | external_id=%s",
+            message.number,
+            message.external_id,
+        )
+        return Response(status_code=500)
 
-    return {"status": status}
+    return Response(status_code=200)

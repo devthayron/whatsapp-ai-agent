@@ -1,73 +1,79 @@
+from datetime import datetime
+
+from app.schemas.message import MessageSchema
 from database.conversations import (
+    TIMEZONE,
     get_message_history,
     message_exists,
-    save_exchange,
+    save_conversation,
 )
-from database.models import Message, User
+from database.models import Message
+from database.users import get_or_create_user
 
 
-def _msg(**o):
-    base = {
-        "number": "5511999999999",
-        "push_name": "Fulano",
-        "content": "oi",
-        "message_type": "conversation",
-        "message_id": "M1",
-        "timestamp": None,
-    }
-    base.update(o)
-    return base
+def _user_message(user_id, external_id="evolution_M1", content="oi"):
+    return MessageSchema(
+        external_id=external_id,
+        user_id=user_id,
+        role="user",
+        content=content,
+        content_type="text",
+        sent_at=datetime.now(TIMEZONE),
+    )
 
 
-def test_save_exchange_is_atomic(db_session):
-    assert save_exchange(_msg(), "olá") is True
-    assert save_exchange(_msg(), "olá de novo") is False  # mesmo message_id
+def _user(number="5511999999999"):
+    return get_or_create_user(number, "Fulano")
+
+
+def test_save_conversation_is_atomic(db_session):
+    user = _user()
+
+    assert save_conversation(_user_message(user.id), "olá") is True
+    # mesmo external_id
+    assert save_conversation(_user_message(user.id), "olá de novo") is False
 
     roles = [m.role for m in db_session.query(Message).order_by(Message.id)]
     assert roles == ["user", "assistant"]  # a segunda tentativa não deixou lixo
 
 
-def test_save_exchange_creates_user(db_session):
-    save_exchange(_msg(number="5511977777777", push_name="Novo"), "olá")
-
-    user = db_session.query(User).filter_by(number="5511977777777").one()
-    assert user.name == "Novo"
-
-
 def test_message_exists(db_session):
-    assert message_exists("M1") is False
-    save_exchange(_msg(), "olá")
-    assert message_exists("M1") is True
+    user = _user()
+
+    assert message_exists("evolution_M1") is False
+    save_conversation(_user_message(user.id), "olá")
+    assert message_exists("evolution_M1") is True
 
 
 def test_message_exists_none_is_false(db_session):
     assert message_exists(None) is False
 
 
-def test_history_follows_insertion_order(db_session):
-    save_exchange(_msg(message_id="M1", content="primeira"), "r1")
-    save_exchange(_msg(message_id="M2", content="segunda"), "r2")
+def test_history_returns_message_schemas_in_order(db_session):
+    user = _user()
+    save_conversation(_user_message(user.id, "evolution_M1", "primeira"), "r1")
+    save_conversation(_user_message(user.id, "evolution_M2", "segunda"), "r2")
 
-    user = db_session.query(User).one()
     history = get_message_history(user.id)
 
-    assert [m["content"] for m in history] == ["primeira", "r1", "segunda", "r2"]
+    assert all(isinstance(m, MessageSchema) for m in history)
+    assert [m.content for m in history] == ["primeira", "r1", "segunda", "r2"]
+    assert [m.role for m in history] == ["user", "assistant", "user", "assistant"]
 
 
 def test_history_respects_limit(db_session):
+    user = _user()
     for i in range(3):
-        save_exchange(_msg(message_id=f"M{i}", content=f"msg{i}"), f"r{i}")
+        save_conversation(_user_message(user.id, f"evolution_M{i}", f"msg{i}"), f"r{i}")
 
-    user = db_session.query(User).one()
     history = get_message_history(user.id, limit=2)
 
-    assert [m["content"] for m in history] == ["msg2", "r2"]
+    assert [m.content for m in history] == ["msg2", "r2"]
 
 
-def test_empty_history(db_session):
-    save_exchange(_msg(number="5511900000000"), "olá")
-    other = db_session.query(User).filter_by(number="5511900000000").one()
-    db_session.query(Message).delete()
-    db_session.commit()
+def test_history_is_isolated_per_user(db_session):
+    user = _user("5511900000000")
+    other = _user("5511911111111")
+    save_conversation(_user_message(user.id), "olá")
 
     assert get_message_history(other.id) == []

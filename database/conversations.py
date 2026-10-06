@@ -4,9 +4,9 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.exc import IntegrityError
 
+from app.schemas.message import MessageSchema
 from database.connection import SessionLocal
 from database.models import Message
-from database.users import _get_or_create_user
 
 logger = logging.getLogger(__name__)
 
@@ -14,14 +14,14 @@ TIMEZONE = ZoneInfo("America/Sao_Paulo")
 CONTEXT_MESSAGES_LIMIT = 30
 
 
-def timestamp_to_datetime(timestamp):
+def timestamp_to_datetime(timestamp: float | datetime | None) -> datetime | None:
     if isinstance(timestamp, (int, float)):
         return datetime.fromtimestamp(timestamp, tz=TIMEZONE)
 
     return timestamp
 
 
-def message_exists(external_id):
+def message_exists(external_id: str | None) -> bool:
     """Só leitura. Usado para descartar retries de mensagens já processadas."""
     if not external_id:
         return False
@@ -33,38 +33,29 @@ def message_exists(external_id):
         )
 
 
-def save_conversation(msg, response):
+def save_conversation(user_message: MessageSchema, response: str) -> bool:
     """
-    Grava a mensagem do usuário e a resposta numa única transação:
-    ou entram as duas, ou nenhuma.
+    Grava a mensagem do usuário e a resposta do assistant numa única
+    transação: ou entram as duas, ou nenhuma.
     """
-    now = datetime.now(TIMEZONE)
-    sent_at = timestamp_to_datetime(msg["timestamp"] or now)
+    assistant_message = MessageSchema(
+        external_id=None,
+        user_id=user_message.user_id,
+        role="assistant",
+        content=response,
+        content_type="text",
+        sent_at=datetime.now(TIMEZONE),
+    )
 
     with SessionLocal() as session:
         try:
-            user = _get_or_create_user(session, msg["number"], msg["push_name"])
+            user_message_db = Message(**user_message.model_dump(exclude={"id"}))
 
-            session.add_all(
-                [
-                    Message(
-                        external_id=msg["external_id"],
-                        user_id=user.id,
-                        role="user",
-                        content=msg["content"],
-                        content_type=msg["content_type"],
-                        sent_at=sent_at,
-                    ),
-                    Message(
-                        external_id=None,
-                        user_id=user.id,
-                        role="assistant",
-                        content=response,
-                        content_type="text",
-                        sent_at=now,
-                    ),
-                ]
+            assistant_message_db = Message(
+                **assistant_message.model_dump(exclude={"id"})
             )
+
+            session.add_all([user_message_db, assistant_message_db])
 
             session.commit()
 
@@ -72,22 +63,24 @@ def save_conversation(msg, response):
             session.rollback()
             logger.warning(
                 "Conversa não gravada (violação de unicidade) | "
-                "number=%s | external_id=%s",
-                msg["number"],
-                msg["external_id"],
+                "user_id=%s | external_id=%s",
+                user_message.user_id,
+                user_message.external_id,
             )
             return False
 
     logger.debug(
-        "Conversa gravada | number=%s | external_id=%s",
-        msg["number"],
-        msg["external_id"],
+        "Conversa gravada | user_id=%s | external_id=%s",
+        user_message.user_id,
+        user_message.external_id,
     )
 
     return True
 
 
-def get_message_history(user_id, limit=CONTEXT_MESSAGES_LIMIT):
+def get_message_history(
+    user_id: int, limit: int = CONTEXT_MESSAGES_LIMIT
+) -> list[MessageSchema]:
     """
     Retorna as últimas mensagens da conversa em ordem cronológica.
 
@@ -104,15 +97,6 @@ def get_message_history(user_id, limit=CONTEXT_MESSAGES_LIMIT):
 
         messages.reverse()
 
-        logger.debug(
-            "Histórico recuperado | total_messages=%s",
-            len(messages),
-        )
+        logger.debug("Histórico recuperado | total_messages=%s", len(messages))
 
-        return [
-            {
-                "role": message.role,
-                "content": (message.content or "").strip(),
-            }
-            for message in messages
-        ]
+        return [MessageSchema.model_validate(m) for m in messages]

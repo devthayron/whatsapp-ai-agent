@@ -1,11 +1,15 @@
 import logging
 import time
+from datetime import datetime
 
 from agent.model import generate_response
+from app.schemas.message import MessageReceived, MessageSchema
 from database.conversations import (
+    TIMEZONE,
     get_message_history,
     message_exists,
     save_conversation,
+    timestamp_to_datetime,
 )
 from database.users import get_or_create_user
 
@@ -16,45 +20,51 @@ ERROR_MESSAGE = (
 )
 
 
-def process_conversation(msg, send_msg):
+def process_conversation(
+    message: MessageReceived,
+    send_msg=None,
+):
     """
-    Processa uma mensagem, gera e envia a resposta e salva a conversa.
+    Processa uma mensagem, gera a resposta e salva a conversa.
 
-    Args:
-        msg: Dados normalizados da mensagem.
-        send_msg: Função responsável por enviar a mensagem ao usuário.
-
-    Returns:
-        "processed", "duplicate" ou "failed".
+    Se send_msg for informado, envia a resposta pela integração.
     """
 
     start = time.monotonic()
-    number = msg["number"]
-    external_id = msg["external_id"]
 
-    logger.info(
-        "Processando mensagem | number=%s | external_id=%s",
-        number,
-        external_id,
-    )
-
-    if message_exists(external_id):
+    if message_exists(message.external_id):
         logger.info(
-            "Mensagem duplicada | number=%s | external_id=%s", number, external_id
+            "Mensagem duplicada | number=%s | external_id=%s",
+            message.number,
+            message.external_id,
         )
-        return "duplicate"
 
-    user_id = get_or_create_user(number=number, name=msg["push_name"])
-
-    history = get_message_history(user_id)
-    history.append(
-        {
-            "role": "user",
-            "content": msg["content"],
+        return {
+            "status": "duplicate",
+            "response": None,
         }
+
+    user = get_or_create_user(number=message.number, name=message.name)
+
+    user_message = MessageSchema(
+        external_id=message.external_id,
+        user_id=user.id,
+        role="user",
+        content=message.content,
+        content_type=message.content_type,
+        sent_at=timestamp_to_datetime(
+            message.timestamp
+            if message.timestamp is not None
+            else datetime.now(TIMEZONE)
+        ),
     )
 
-    logger.debug("Contexto recuperado | number=%s | messages=%s", number, len(history))
+    history = get_message_history(user.id)
+    history.append(user_message)
+
+    logger.debug(
+        "Contexto recuperado | number=%s | messages=%s", message.number, len(history)
+    )
 
     try:
         response = generate_response(history)
@@ -62,48 +72,63 @@ def process_conversation(msg, send_msg):
     except Exception:
         logger.exception(
             "Falha ao gerar resposta da IA | number=%s | external_id=%s",
-            number,
-            external_id,
+            message.number,
+            message.external_id,
         )
 
+        if send_msg is not None:
+            try:
+                send_msg(ERROR_MESSAGE)
+            except Exception:
+                logger.exception(
+                    "Falha ao enviar fallback | number=%s | external_id=%s",
+                    message.number,
+                    message.external_id,
+                )
+
+        return {
+            "status": "failed",
+            "response": ERROR_MESSAGE,
+        }
+
+    if send_msg:
         try:
-            send_msg(ERROR_MESSAGE)
+            send_msg(response)
 
         except Exception:
             logger.exception(
-                "Falha ao enviar fallback | number=%s | external_id=%s",
-                number,
-                external_id,
+                "Falha ao enviar resposta | number=%s | external_id=%s",
+                message.number,
+                message.external_id,
             )
 
-        return "failed"
+            return {
+                "status": "failed",
+                "response": response,
+            }
 
-    try:
-        send_msg(response)
-
-    except Exception:
-        logger.exception(
-            "Falha ao enviar resposta | number=%s | external_id=%s",
-            number,
-            external_id,
-        )
-        return "failed"
-
-    if not save_conversation(msg, response):
+    if not save_conversation(user_message, response):
         logger.error(
-            "Resposta enviada mas não gravada | number=%s | external_id=%s",
-            number,
-            external_id,
+            "Resposta gerada mas não gravada | number=%s | external_id=%s",
+            message.number,
+            message.external_id,
         )
-        return "failed"
+
+        return {
+            "status": "failed",
+            "response": response,
+        }
 
     elapsed = time.monotonic() - start
 
     logger.info(
         "Processamento concluído | number=%s | external_id=%s | tempo=%.2fs",
-        number,
-        external_id,
+        message.number,
+        message.external_id,
         elapsed,
     )
 
-    return "processed"
+    return {
+        "status": "processed",
+        "response": response,
+    }

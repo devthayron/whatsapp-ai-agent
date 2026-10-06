@@ -1,12 +1,12 @@
 import logging
 import time
 from functools import lru_cache
-from typing import Any
 
 from langchain.chat_models import init_chat_model
 from langchain.messages import SystemMessage
 
 from agent.prompt import SYSTEM_PROMPT
+from app.schemas.message import MessageSchema
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # reutiliza o mesmo modelo (não permite trocar o modelo com o app rodando, so se resetar)
 @lru_cache(maxsize=1)
 def get_model():
-    logger.info(
+    logger.debug(
         "Inicializando modelo de IA | provider=%s | model=%s",
         settings.AI_PROVIDER,
         settings.AI_MODEL,
@@ -32,12 +32,12 @@ def get_model():
     return init_chat_model(**kwargs)
 
 
-def generate_response(messages: list[dict[str, Any]]) -> str:
+def generate_response(history: list[MessageSchema]) -> str:
     """
     Gera uma resposta usando o modelo de IA configurado.
 
     Args:
-        messages: Lista de mensagens contendo o histórico da conversa.
+        history: Histórico da conversa (já incluindo a mensagem atual).
 
     Returns:
         Texto gerado pelo modelo de IA.
@@ -47,7 +47,10 @@ def generate_response(messages: list[dict[str, Any]]) -> str:
 
     model_messages = [
         SystemMessage(content=SYSTEM_PROMPT),
-        *messages,
+        *[
+            {"role": message.role, "content": message.content.strip()}
+            for message in history
+        ],
     ]
 
     logger.debug(

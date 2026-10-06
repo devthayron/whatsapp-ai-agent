@@ -1,5 +1,7 @@
 import logging
 
+from app.schemas.message import MessageReceived
+
 logger = logging.getLogger(__name__)
 
 
@@ -93,16 +95,12 @@ def normalize_phone(number: str | None) -> str | None:
     return number.split("@")[0]
 
 
-def normalize_message(raw_message):
+def normalize_message(raw_message: dict) -> MessageReceived | None:
     key = raw_message.get("key", {})
 
-    # ID da mensagem fornecido pelo serviço externo
     message_id = key.get("id")
-
     remote_jid = key.get("remoteJid")
     remote_jid_alt = key.get("remoteJidAlt")
-    timestamp = raw_message.get("messageTimestamp")
-    push_name = raw_message.get("pushName")
 
     content_type, content = handle_message_type(raw_message)
 
@@ -123,11 +121,11 @@ def normalize_message(raw_message):
         )
         return None
 
-    return {
-        "external_id": message_id,
-        "number": number,
-        "push_name": push_name,
-        "content": content,
-        "content_type": content_type,
-        "timestamp": timestamp,
-    }
+    return MessageReceived(
+        external_id=f"evolution_{message_id}" if message_id else None,
+        number=number,
+        name=raw_message.get("pushName"),
+        content=content,
+        content_type=content_type,
+        timestamp=raw_message.get("messageTimestamp"),
+    )
