@@ -8,6 +8,19 @@ logger = logging.getLogger(__name__)
 
 
 def get_or_create_user(number: str, name: str | None) -> UserSchema:
+    """
+    Retorna o usuário pelo número, criando-o caso não exista.
+
+    Se o usuário já existir e um novo nome for informado, o nome é atualizado.
+
+    Args:
+        number: Número do usuário.
+        name: Nome informado pelo contato, se disponível.
+
+    Returns:
+        Dados do usuário encontrado ou criado.
+    """
+
     with SessionLocal() as session:
         user = session.query(User).filter_by(number=number).one_or_none()
 

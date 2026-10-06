@@ -16,6 +16,15 @@ router = APIRouter(prefix="/webhook", tags=["Webhook"])
 
 @router.post("/")
 def webhook(payload: Annotated[dict, Body()]):
+    """
+    Recebe o webhook da Evolution API e encaminha mensagens válidas
+    para o processamento da conversa.
+
+    O webhook retorna 200 para eventos ignorados ou processados, pois
+    a resposta ao usuário é enviada separadamente pela Evolution API.
+    Retorna 500 apenas em caso de erro inesperado durante o processamento.
+    """
+
     raw_message = extract_webhook_message(payload)
 
     if not raw_message:

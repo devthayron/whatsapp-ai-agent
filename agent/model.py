@@ -12,9 +12,9 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 
-# reutiliza o mesmo modelo (não permite trocar o modelo com o app rodando, so se resetar)
 @lru_cache(maxsize=1)
 def get_model():
+    """Retorna a instância cacheada do modelo de IA configurado."""
     logger.debug(
         "Inicializando modelo de IA | provider=%s | model=%s",
         settings.AI_PROVIDER,
@@ -37,7 +37,7 @@ def generate_response(history: list[MessageSchema]) -> str:
     Gera uma resposta usando o modelo de IA configurado.
 
     Args:
-        history: Histórico da conversa (já incluindo a mensagem atual).
+        history: Histórico da conversa, incluindo a mensagem atual.
 
     Returns:
         Texto gerado pelo modelo de IA.

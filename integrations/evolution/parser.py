@@ -6,6 +6,19 @@ logger = logging.getLogger(__name__)
 
 
 def extract_webhook_message(payload):
+    """
+    Extrai uma mensagem válida de um evento de webhook.
+
+    Ignora eventos que não sejam de novas mensagens, mensagens enviadas
+    pelo próprio bot e conversas que não sejam chats individuais.
+
+    Args:
+        payload: Payload recebido da Evolution API.
+
+    Returns:
+        Mensagem bruta quando válida, ou None quando deve ser ignorada.
+    """
+
     event = payload.get("event")
 
     # Processa apenas novas mensagens recebidas
@@ -42,14 +55,12 @@ def extract_webhook_message(payload):
 
 
 def handle_text(raw_message):
-    """Texto simples."""
     content = raw_message.get("message", {}).get("conversation")
 
     return "text", content
 
 
 def handle_extended_text(raw_message):
-    """Texto com link, resposta (reply) ou preview."""
     content = raw_message.get("message", {}).get("extendedTextMessage", {}).get("text")
 
     return "text", content
@@ -64,11 +75,16 @@ MESSAGE_TYPE_HANDLERS = {
 
 def handle_message_type(raw_message):
     """
-    Retorna (content_type, content).
+    Extrai e normaliza o conteúdo conforme o tipo de mensagem recebido.
 
-    content_type é o tipo definido pela aplicação.
-    content é None quando o tipo não é suportado ou não há texto.
+    Args:
+        raw_message: Mensagem bruta da Evolution API.
+
+    Returns:
+        Tupla com o tipo e o conteúdo normalizados, ou None no conteúdo
+        quando o tipo não é suportado ou não há texto válido.
     """
+
     message_type = raw_message.get("messageType")
 
     handler = MESSAGE_TYPE_HANDLERS.get(message_type)
@@ -96,6 +112,17 @@ def normalize_phone(number: str | None) -> str | None:
 
 
 def normalize_message(raw_message: dict) -> MessageReceived | None:
+    """
+    Converte uma mensagem bruta da Evolution para o schema da aplicação.
+
+    Args:
+        raw_message: Mensagem bruta da Evolution API.
+
+    Returns:
+        Mensagem normalizada ou None quando não houver conteúdo válido
+        ou número identificável.
+    """
+
     key = raw_message.get("key", {})
 
     message_id = key.get("id")

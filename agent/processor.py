@@ -20,14 +20,15 @@ ERROR_MESSAGE = (
 )
 
 
-def process_conversation(
-    message: MessageReceived,
-    send_msg=None,
-):
-    """
-    Processa uma mensagem, gera a resposta e salva a conversa.
+def process_conversation(message: MessageReceived, send_msg=None) -> dict:
+    """Processa a conversa recebida, gerando uma resposta usando o modelo de IA.
 
-    Se send_msg for informado, envia a resposta pela integração.
+    Args:
+        message: Mensagem recebida e normalizada.
+        send_msg: Função para enviar a resposta gerada. Se None, não envia a resposta.
+
+    Returns:
+        dict: retorna um dicionário com o status do processamento e a resposta gerada (se houver).
     """
 
     start = time.monotonic()
@@ -91,7 +92,7 @@ def process_conversation(
             "response": ERROR_MESSAGE,
         }
 
-    if send_msg:
+    if send_msg is not None:
         try:
             send_msg(response)
 

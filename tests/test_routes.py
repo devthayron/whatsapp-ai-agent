@@ -24,12 +24,20 @@ def client():
 def mock_chat_dependencies(monkeypatch):
     calls = []
 
-    def fake_process_conversation(message, send):
+    def fake_process_conversation(message, send=None):
         calls.append(("process_conversation", message))
-        send("resposta simulada")
-        return "processed"
 
-    monkeypatch.setattr(chat_module, "process_conversation", fake_process_conversation)
+        return {
+            "status": "processed",
+            "response": "resposta simulada",
+        }
+
+    monkeypatch.setattr(
+        chat_module,
+        "process_conversation",
+        fake_process_conversation,
+    )
+
     return calls
 
 
@@ -40,18 +48,37 @@ def mock_webhook_dependencies(monkeypatch):
     def fake_process_conversation(message, send):
         calls.append(("process_conversation", message))
         send("resposta simulada")
-        return "processed"
+
+        return {
+            "status": "processed",
+            "response": "resposta simulada",
+        }
 
     def fake_send_message(number, text):
-        calls.append(("send_message", {"number": number, "text": text}))
+        calls.append(
+            (
+                "send_message",
+                {
+                    "number": number,
+                    "text": text,
+                },
+            )
+        )
+
         return {"status": "ok"}
 
     monkeypatch.setattr(
-        webhook_module, "process_conversation", fake_process_conversation
+        webhook_module,
+        "process_conversation",
+        fake_process_conversation,
     )
+
     monkeypatch.setattr(
-        webhook_module.evolution_service, "send_message", fake_send_message
+        webhook_module.evolution_service,
+        "send_message",
+        fake_send_message,
     )
+
     return calls
 
 
@@ -61,7 +88,11 @@ def mock_webhook_dependencies(monkeypatch):
 def test_chat_returns_response(client, mock_chat_dependencies):
     response = client.post(
         "/chat/",
-        json={"number": "5511999999999", "content": "Oi", "name": "Fulano"},
+        json={
+            "number": "5511999999999",
+            "content": "Oi",
+            "name": "Fulano",
+        },
     )
 
     assert response.status_code == 200
@@ -74,12 +105,17 @@ def test_chat_returns_response(client, mock_chat_dependencies):
 def test_chat_passes_message_received(client, mock_chat_dependencies):
     client.post(
         "/chat/",
-        json={"number": "5511999999999", "content": "Oi", "name": "Fulano"},
+        json={
+            "number": "5511999999999",
+            "content": "Oi",
+            "name": "Fulano",
+        },
     )
 
     call = next(c for c in mock_chat_dependencies if c[0] == "process_conversation")
 
     assert isinstance(call[1], MessageReceived)
+
     assert call[1] == MessageReceived(
         number="5511999999999",
         name="Fulano",
@@ -91,7 +127,10 @@ def test_chat_passes_message_received(client, mock_chat_dependencies):
 def test_chat_without_name(client, mock_chat_dependencies):
     response = client.post(
         "/chat/",
-        json={"number": "5511999999999", "content": "Oi"},
+        json={
+            "number": "5511999999999",
+            "content": "Oi",
+        },
     )
 
     assert response.status_code == 200
@@ -102,9 +141,15 @@ def test_chat_without_name(client, mock_chat_dependencies):
 
 
 def test_chat_missing_content(client, mock_chat_dependencies):
-    response = client.post("/chat/", json={"number": "5511999999999"})
+    response = client.post(
+        "/chat/",
+        json={
+            "number": "5511999999999",
+        },
+    )
 
     assert response.status_code == 422
+
     assert not any(c[0] == "process_conversation" for c in mock_chat_dependencies)
 
 
@@ -127,30 +172,48 @@ def _payload(
             "messageTimestamp": 1710000000,
             "pushName": "Fulano",
             "messageType": "conversation",
-            "message": {"conversation": content},
+            "message": {
+                "conversation": content,
+            },
         },
     }
 
 
 def test_webhook_ignores_event(client, mock_webhook_dependencies):
-    response = client.post("/webhook/", json={"event": "connection.update", "data": {}})
+    response = client.post(
+        "/webhook/",
+        json={
+            "event": "connection.update",
+            "data": {},
+        },
+    )
 
-    assert response.json() == {"status": "ignored"}
+    assert response.status_code == 200
+    assert response.content == b""
+
     assert mock_webhook_dependencies == []
 
 
 def test_webhook_ignores_group(client, mock_webhook_dependencies):
-    response = client.post("/webhook/", json=_payload(remote_jid="123456789@g.us"))
+    response = client.post(
+        "/webhook/",
+        json=_payload(remote_jid="123456789@g.us"),
+    )
 
-    assert response.json() == {"status": "ignored"}
+    assert response.status_code == 200
+    assert response.content == b""
+
     assert mock_webhook_dependencies == []
 
 
 def test_webhook_processes_message(client, mock_webhook_dependencies):
-    response = client.post("/webhook/", json=_payload())
+    response = client.post(
+        "/webhook/",
+        json=_payload(),
+    )
 
     assert response.status_code == 200
-    assert response.json() == {"status": "processed"}
+    assert response.content == b""
 
     process = next(
         c for c in mock_webhook_dependencies if c[0] == "process_conversation"
@@ -163,47 +226,83 @@ def test_webhook_processes_message(client, mock_webhook_dependencies):
 
     send = next(c for c in mock_webhook_dependencies if c[0] == "send_message")
 
-    assert send[1] == {"number": "5511999999999", "text": "resposta simulada"}
+    assert send[1] == {
+        "number": "5511999999999",
+        "text": "resposta simulada",
+    }
 
 
 def test_webhook_ignores_bot_message(client, mock_webhook_dependencies):
-    response = client.post("/webhook/", json=_payload(from_me=True))
+    response = client.post(
+        "/webhook/",
+        json=_payload(from_me=True),
+    )
 
-    assert response.json() == {"status": "ignored"}
+    assert response.status_code == 200
+    assert response.content == b""
+
     assert mock_webhook_dependencies == []
 
 
 def test_webhook_ignores_invalid_message(
-    client, mock_webhook_dependencies, monkeypatch
+    client,
+    mock_webhook_dependencies,
+    monkeypatch,
 ):
-    monkeypatch.setattr(webhook_module, "normalize_message", lambda x: None)
+    monkeypatch.setattr(
+        webhook_module,
+        "normalize_message",
+        lambda x: None,
+    )
 
-    response = client.post("/webhook/", json=_payload())
+    response = client.post(
+        "/webhook/",
+        json=_payload(),
+    )
 
-    assert response.json() == {"status": "ignored"}
+    assert response.status_code == 200
+    assert response.content == b""
+
     assert mock_webhook_dependencies == []
 
 
 def test_webhook_ignores_non_text(client, mock_webhook_dependencies):
     payload = _payload()
+
     payload["data"]["messageType"] = "audioMessage"
     payload["data"]["message"] = {}
 
-    response = client.post("/webhook/", json=payload)
+    response = client.post(
+        "/webhook/",
+        json=payload,
+    )
 
-    assert response.json() == {"status": "ignored"}
+    assert response.status_code == 200
+    assert response.content == b""
+
     assert mock_webhook_dependencies == []
 
 
 def test_webhook_duplicate_does_not_send(
-    client, mock_webhook_dependencies, monkeypatch
+    client,
+    mock_webhook_dependencies,
+    monkeypatch,
 ):
     monkeypatch.setattr(
-        webhook_module, "process_conversation", lambda msg, send: "duplicate"
+        webhook_module,
+        "process_conversation",
+        lambda msg, send: {
+            "status": "duplicate",
+            "response": None,
+        },
     )
 
-    response = client.post("/webhook/", json=_payload())
+    response = client.post(
+        "/webhook/",
+        json=_payload(),
+    )
 
     assert response.status_code == 200
-    assert response.json() == {"status": "duplicate"}
+    assert response.content == b""
+
     assert not any(c[0] == "send_message" for c in mock_webhook_dependencies)

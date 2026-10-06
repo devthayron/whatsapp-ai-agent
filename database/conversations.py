@@ -22,7 +22,7 @@ def timestamp_to_datetime(timestamp: float | datetime | None) -> datetime | None
 
 
 def message_exists(external_id: str | None) -> bool:
-    """Só leitura. Usado para descartar retries de mensagens já processadas."""
+    """Verifica se uma mensagem já foi registrada pelo identificador externo."""
     if not external_id:
         return False
 
@@ -35,8 +35,9 @@ def message_exists(external_id: str | None) -> bool:
 
 def save_conversation(user_message: MessageSchema, response: str) -> bool:
     """
-    Grava a mensagem do usuário e a resposta do assistant numa única
-    transação: ou entram as duas, ou nenhuma.
+    Salva a mensagem do usuário e a resposta do assistente em uma única transação.
+
+    A operação é atômica: ambas as mensagens são gravadas ou nenhuma é persistida.
     """
     assistant_message = MessageSchema(
         external_id=None,
@@ -84,8 +85,14 @@ def get_message_history(
     """
     Retorna as últimas mensagens da conversa em ordem cronológica.
 
-    A ordem vem do id autoincremental (ordem real de gravação).
+    Args:
+        user_id: ID do usuário.
+        limit: Quantidade máxima de mensagens retornadas.
+
+    Returns:
+        Lista de mensagens da conversa.
     """
+
     with SessionLocal() as session:
         messages = (
             session.query(Message)

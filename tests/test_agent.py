@@ -39,7 +39,10 @@ def _roles(db_session):
 def test_success_sends_and_saves_both(db_session, ai):
     sent = []
 
-    assert process_conversation(_msg(), sent.append) == "processed"
+    result = process_conversation(_msg(), sent.append)
+
+    assert result["status"] == "processed"
+    assert result["response"] == "resposta da IA"
 
     assert sent == ["resposta da IA"]
     assert _roles(db_session) == ["user", "assistant"]
@@ -49,18 +52,26 @@ def test_ai_receives_current_message(db_session, ai):
     process_conversation(_msg(content="oi"), lambda t: None)
 
     last = ai[0][-1]
+
     assert (last.role, last.content) == ("user", "oi")
 
 
 def test_history_includes_previous_exchange(db_session, ai):
     process_conversation(
-        _msg(external_id="evolution_M1", content="primeira"), lambda t: None
-    )
-    process_conversation(
-        _msg(external_id="evolution_M2", content="segunda"), lambda t: None
+        _msg(external_id="evolution_M1", content="primeira"),
+        lambda t: None,
     )
 
-    assert [m.content for m in ai[1]] == ["primeira", "resposta da IA", "segunda"]
+    process_conversation(
+        _msg(external_id="evolution_M2", content="segunda"),
+        lambda t: None,
+    )
+
+    assert [m.content for m in ai[1]] == [
+        "primeira",
+        "resposta da IA",
+        "segunda",
+    ]
 
 
 def test_ai_failure_sends_fallback_and_saves_nothing(db_session, monkeypatch):
@@ -68,9 +79,13 @@ def test_ai_failure_sends_fallback_and_saves_nothing(db_session, monkeypatch):
         raise ConnectionError()
 
     monkeypatch.setattr(proc, "generate_response", boom)
+
     sent = []
 
-    assert process_conversation(_msg(), sent.append) == "failed"
+    result = process_conversation(_msg(), sent.append)
+
+    assert result["status"] == "failed"
+    assert result["response"] == ERROR_MESSAGE
 
     assert sent == [ERROR_MESSAGE]
     assert db_session.query(Message).count() == 0
@@ -81,14 +96,23 @@ def test_send_failure_saves_nothing_and_retry_delivers(db_session, ai):
 
     def flaky_send(text):
         attempts["n"] += 1
+
         if attempts["n"] == 1:
             raise ConnectionError()
+
         sent.append(text)
 
-    assert process_conversation(_msg(), flaky_send) == "failed"
+    result = process_conversation(_msg(), flaky_send)
+
+    assert result["status"] == "failed"
+    assert result["response"] == "resposta da IA"
+
     assert db_session.query(Message).count() == 0
 
-    assert process_conversation(_msg(), flaky_send) == "processed"
+    result = process_conversation(_msg(), flaky_send)
+
+    assert result["status"] == "processed"
+    assert result["response"] == "resposta da IA"
 
     assert sent == ["resposta da IA"]
     assert _roles(db_session) == ["user", "assistant"]
@@ -97,9 +121,13 @@ def test_send_failure_saves_nothing_and_retry_delivers(db_session, ai):
 def test_duplicate_is_not_answered_again(db_session, ai):
     sent = []
 
-    process_conversation(_msg(), sent.append)
-    status = process_conversation(_msg(), sent.append)
+    first = process_conversation(_msg(), sent.append)
+    second = process_conversation(_msg(), sent.append)
 
-    assert status == "duplicate"
+    assert first["status"] == "processed"
+
+    assert second["status"] == "duplicate"
+    assert second["response"] is None
+
     assert sent == ["resposta da IA"]
     assert len(ai) == 1

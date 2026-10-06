@@ -26,6 +26,18 @@ class EvolutionService:
         )
 
     def _post(self, url, payload, operation):
+        """
+        Executa uma requisição POST e registra erros de comunicação ou HTTP.
+
+        Args:
+            url: URL da requisição.
+            payload: Dados enviados no corpo da requisição.
+            operation: Descrição da operação para os logs.
+
+        Returns:
+            Resposta HTTP da Evolution API.
+        """
+
         try:
             response = self.session.post(url, json=payload, timeout=REQUEST_TIMEOUT)
             response.raise_for_status()
@@ -52,6 +64,16 @@ class EvolutionService:
 
     @staticmethod
     def _get_json(response):
+        """
+        Extrai o JSON da resposta ou registra erro caso seja inválido.
+
+        Args:
+            response: Resposta HTTP da Evolution API.
+
+        Returns:
+            Conteúdo JSON da resposta.
+        """
+
         try:
             return response.json()
         except ValueError:
@@ -63,6 +85,17 @@ class EvolutionService:
             raise
 
     def send_message(self, number: str, text: str):
+        """
+        Envia uma mensagem de texto para um número do WhatsApp.
+
+        Args:
+            number: Número do destinatário.
+            text: Conteúdo da mensagem.
+
+        Returns:
+            Dados retornados pela Evolution API.
+        """
+
         payload = {
             "number": f"{number}@s.whatsapp.net",
             "text": text,
