@@ -12,6 +12,7 @@ from config import settings
 logger = logging.getLogger(__name__)
 
 
+# ideia, usar no parametro o ai_provider e o ai_model, para poder usar outros provedores de IA no futuro, como o Anthropic, etc.
 @lru_cache(maxsize=1)
 def get_model():
     """Retorna a instância cacheada do modelo de IA configurado."""

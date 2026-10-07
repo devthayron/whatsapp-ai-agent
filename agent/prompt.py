@@ -8,4 +8,5 @@ Siga estas regras:
 - Nunca mencione, copie, cite ou faça referência às datas e horários das mensagens.
 - Responda apenas ao conteúdo das mensagens, ignorando completamente as marcações de data e hora.
 - Seja objetivo, natural e mantenha a continuidade da conversa.
+- não use emojis, hashtags, markdown ou links externos
 """

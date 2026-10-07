@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -18,7 +19,7 @@ class MessageSchema(BaseModel):
     id: int | None = None
     external_id: str | None = None
     user_id: int
-    role: str
+    role: Literal["user", "assistant"]
     content: str
     content_type: str
     sent_at: datetime

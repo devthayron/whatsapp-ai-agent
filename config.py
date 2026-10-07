@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     API_KEY_EVO: str
     BASE_URL: str
     INSTANCE: str
+    WEBHOOK_URL: str
+    WEBHOOK_SECRET: str
 
     OPENAI_API_KEY: str
 
