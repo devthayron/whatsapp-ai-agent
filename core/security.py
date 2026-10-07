@@ -6,8 +6,7 @@ from config import settings
 
 
 def create_token(
-    account_id: int,
-    expires_delta: timedelta | None = None,
+    account_id: int, expires_delta: timedelta | None = None, token_type: str = "access"
 ) -> str:
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -16,6 +15,7 @@ def create_token(
 
     payload = {
         "sub": str(account_id),
+        "type": token_type,
         "exp": exp,
     }
 

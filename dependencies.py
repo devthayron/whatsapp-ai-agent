@@ -39,11 +39,11 @@ def decode_token(token: str) -> dict:
         raise HTTPException(status_code=401, detail="Token inválido")
 
 
-def verify_token(
-    token: str = Depends(oauth2_scheme),
-    session: Session = Depends(get_session),  # noqa: B008
-) -> Account:
+def verify_token_type(token: str, session: Session, expected_type: str) -> Account:
     payload = decode_token(token)
+
+    if payload.get("type") != expected_type:
+        raise HTTPException(status_code=401, detail="Tipo de token inválido")
 
     account_id = payload.get("sub")
 
@@ -52,6 +52,7 @@ def verify_token(
 
     try:
         account_id = int(account_id)
+
     except (TypeError, ValueError):
         raise HTTPException(status_code=401, detail="Token inválido")
 
@@ -64,3 +65,17 @@ def verify_token(
         raise HTTPException(status_code=403, detail="Conta desativada")
 
     return account
+
+
+def verify_token(
+    token: str = Depends(oauth2_scheme),
+    session: Session = Depends(get_session),  # noqa: B008
+) -> Account:
+    return verify_token_type(token, session, "access")
+
+
+def verify_refresh_token(
+    token: str = Depends(oauth2_scheme),
+    session: Session = Depends(get_session),  # noqa: B008
+) -> Account:
+    return verify_token_type(token, session, "refresh")

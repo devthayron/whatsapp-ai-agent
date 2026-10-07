@@ -7,7 +7,12 @@ from sqlalchemy.orm import Session
 from app.schemas.user import AccountCreate, AccountLogin
 from core.security import create_token
 from database.models import Account
-from dependencies import get_session, password_hasher, verify_token
+from dependencies import (
+    get_session,
+    password_hasher,
+    verify_refresh_token,
+    verify_token,
+)
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -53,31 +58,20 @@ def register(account: AccountCreate, session: Session = Depends(get_session)):  
 @router.post("/login")
 def login(
     credentials: AccountLogin,
-    session: Session = Depends(get_session),
+    session: Session = Depends(get_session),  # noqa: B008
 ):
-    account = authenticate_account(
-        credentials.email,
-        credentials.password,
-        session,
-    )
+    account = authenticate_account(credentials.email, credentials.password, session)
 
     if not account:
-        raise HTTPException(
-            status_code=401,
-            detail="Email ou senha incorretos",
-        )
+        raise HTTPException(status_code=401, detail="Email ou senha incorretos")
 
     if not account.is_active:
-        raise HTTPException(
-            status_code=403,
-            detail="Conta desativada",
-        )
+        raise HTTPException(status_code=403, detail="Conta desativada")
 
-    access_token = create_token(account.id)
+    access_token = create_token(account.id, token_type="access")
 
     refresh_token = create_token(
-        account.id,
-        timedelta(days=7),
+        account.id, expires_delta=timedelta(days=7), token_type="refresh"
     )
 
     return {
@@ -89,26 +83,16 @@ def login(
 
 @router.post("/login-oauth2")
 def login_oauth2(
-    form_data: OAuth2PasswordRequestForm = Depends(),
-    session: Session = Depends(get_session),
+    form_data: OAuth2PasswordRequestForm = Depends(),  # noqa: B008
+    session: Session = Depends(get_session),  # noqa: B008
 ):
-    account = authenticate_account(
-        form_data.username,
-        form_data.password,
-        session,
-    )
+    account = authenticate_account(form_data.username, form_data.password, session)
 
     if not account:
-        raise HTTPException(
-            status_code=401,
-            detail="Email ou senha incorretos",
-        )
+        raise HTTPException(status_code=401, detail="Email ou senha incorretos")
 
     if not account.is_active:
-        raise HTTPException(
-            status_code=403,
-            detail="Conta desativada",
-        )
+        raise HTTPException(status_code=403, detail="Conta desativada")
 
     access_token = create_token(account.id)
 
@@ -118,21 +102,18 @@ def login_oauth2(
     }
 
 
-@router.get("/refresh")
+@router.post("/refresh")
 def refresh_access_token(
-    account: Account = Depends(verify_token),
+    account: Account = Depends(verify_refresh_token),  # noqa: B008
 ):
-    access_token = create_token(account.id)
+    access_token = create_token(account.id, token_type="access")
 
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-    }
+    return {"access_token": access_token, "token_type": "bearer"}
 
 
 @router.get("/me")
 def get_current_account(
-    account: Account = Depends(verify_token),
+    account: Account = Depends(verify_token),  # noqa: B008
 ):
     return {
         "id": account.id,
