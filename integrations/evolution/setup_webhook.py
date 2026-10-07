@@ -1,6 +1,12 @@
+import logging
+
 import requests
 
 from config import settings
+
+logger = logging.getLogger(__name__)
+
+# executar python -m integrations.evolution.setup_webhook
 
 
 def configure_webhook() -> None:
@@ -23,11 +29,23 @@ def configure_webhook() -> None:
         "Content-Type": "application/json",
     }
 
-    response = requests.post(
-        url,
-        json=payload,
-        headers=headers,
+    logger.info(
+        "Configurando webhook | instance=%s | url=%s",
+        settings.INSTANCE,
+        settings.WEBHOOK_URL,
     )
 
-    print(response.status_code)
-    print(response.text)
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
+
+        logger.info(
+            "Resposta da configuração do webhook | status=%s", response.status_code
+        )
+
+        response.raise_for_status()
+
+    except requests.RequestException:
+        logger.exception("Erro ao configurar webhook | instance=%s", settings.INSTANCE)
+        raise
+
+    logger.info("Webhook configurado com sucesso")

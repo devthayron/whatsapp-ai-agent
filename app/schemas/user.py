@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 
 class UserSchema(BaseModel):
@@ -7,3 +7,14 @@ class UserSchema(BaseModel):
     id: int | None = None
     name: str | None = None
     number: str
+
+
+class AccountCreate(BaseModel):
+    name: str | None = None
+    email: EmailStr
+    password: str
+
+
+class AccountLogin(BaseModel):
+    email: EmailStr
+    password: str

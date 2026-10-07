@@ -6,10 +6,7 @@ from fastapi import APIRouter, Body, Header, HTTPException, Response
 from agent.processor import process_conversation
 from config import settings
 from integrations.evolution.client import evolution_service
-from integrations.evolution.parser import (
-    extract_webhook_message,
-    normalize_message,
-)
+from integrations.evolution.parser import extract_webhook_message, normalize_message
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhook", tags=["Webhook"])

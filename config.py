@@ -10,12 +10,17 @@ class Settings(BaseSettings):
     WEBHOOK_URL: str
     WEBHOOK_SECRET: str
 
+    SECRET_KEY: str
+
     OPENAI_API_KEY: str
 
     DATABASE_URL: str
 
     AI_PROVIDER: str = "openai"
     AI_MODEL: str = "gpt-5.4-nano"
+
+    ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
     LOG_LEVEL: str = "DEBUG"
 

@@ -4,6 +4,7 @@ from logger import setup_logging
 
 setup_logging()
 
+from app.routes.auth import router as auth_router
 from app.routes.chat import router as chat_router
 from app.routes.webhook_evolution import router as webhook_router
 from database.connection import Base, engine
@@ -12,6 +13,7 @@ app = FastAPI()
 
 Base.metadata.create_all(bind=engine)
 
+app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(webhook_router)
 

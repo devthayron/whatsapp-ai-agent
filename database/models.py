@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
 
 from database.connection import Base
@@ -9,7 +9,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=True)
-    number = Column(String, unique=True, nullable=False, index=True)
+    number = Column(String(13), unique=True, nullable=False, index=True)
 
     messages = relationship(
         "Message",
@@ -17,6 +17,16 @@ class User(Base):
         cascade="all, delete-orphan",
         order_by="Message.id",
     )
+
+
+class Account(Base):
+    __tablename__ = "accounts"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=True)
+    email = Column(String, unique=True, nullable=False, index=True)
+    hashed_password = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
 
 
 class Message(Base):
