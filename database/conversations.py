@@ -33,50 +33,37 @@ def message_exists(external_id: str | None) -> bool:
         )
 
 
-def save_conversation(user_message: MessageSchema, response: str) -> bool:
-    """
-    Salva a mensagem do usuário e a resposta do assistente em uma única transação.
-
-    A operação é atômica: ambas as mensagens são gravadas ou nenhuma é persistida.
-    """
-    assistant_message = MessageSchema(
-        external_id=None,
-        user_id=user_message.user_id,
-        role="assistant",
-        content=response,
-        content_type="text",
-        sent_at=datetime.now(TIMEZONE),
-    )
-
+def save_user_message(message: MessageSchema) -> MessageSchema | None:
+    """Grava a mensagem recebida. Retorna None se o external_id já existia."""
     with SessionLocal() as session:
+        row = Message(**message.model_dump(exclude={"id"}))
+        session.add(row)
         try:
-            user_message_db = Message(**user_message.model_dump(exclude={"id"}))
-
-            assistant_message_db = Message(
-                **assistant_message.model_dump(exclude={"id"})
-            )
-
-            session.add_all([user_message_db, assistant_message_db])
-
             session.commit()
-
         except IntegrityError:
             session.rollback()
             logger.warning(
-                "Conversa não gravada (violação de unicidade) | "
-                "user_id=%s | external_id=%s",
-                user_message.user_id,
-                user_message.external_id,
+                "Mensagem não gravada (unicidade) | user_id=%s | external_id=%s",
+                message.user_id,
+                message.external_id,
             )
-            return False
+            return None
+        return MessageSchema.model_validate(row)
 
-    logger.debug(
-        "Conversa gravada | user_id=%s | external_id=%s",
-        user_message.user_id,
-        user_message.external_id,
-    )
 
-    return True
+def save_assistant_message(user_id: int, response: str) -> None:
+    with SessionLocal() as session:
+        session.add(
+            Message(
+                external_id=None,
+                user_id=user_id,
+                role="assistant",
+                content=response,
+                content_type="text",
+                sent_at=datetime.now(TIMEZONE),
+            )
+        )
+        session.commit()
 
 
 def get_message_history(

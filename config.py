@@ -24,6 +24,15 @@ class Settings(BaseSettings):
 
     LOG_LEVEL: str = "DEBUG"
 
+    REDIS_URL: str = "redis://localhost:6379/0"
+
+    DEBOUNCE_SECONDS: int = 7
+    DEBOUNCE_LEASE_SECONDS: int = 120
+    WORKER_IN_API: bool = True
+    WORKER_CONCURRENCY: int = 10
+
+    MESSAGING_PROVIDER: str = "evolution"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

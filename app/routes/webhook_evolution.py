@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Header, HTTPException, Response
 
-from agent.processor import process_conversation
+from agent.processor import enqueue_message
 from config import settings
 from integrations.evolution.client import evolution_service
 from integrations.evolution.parser import extract_webhook_message, normalize_message
@@ -45,7 +45,8 @@ def webhook(
         return evolution_service.send_message(message.number, text)
 
     try:
-        process_conversation(message, send_msg)
+        enqueue_message(message, send_msg)
+
     except Exception:
         logger.exception(
             "Erro inesperado ao processar webhook | number=%s | external_id=%s",

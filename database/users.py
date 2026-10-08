@@ -43,3 +43,9 @@ def get_or_create_user(number: str, name: str | None) -> UserSchema:
         session.commit()
 
         return UserSchema.model_validate(user)
+
+
+def get_user_by_id(user_id: int) -> UserSchema | None:
+    with SessionLocal() as session:
+        user = session.get(User, user_id)
+        return UserSchema.model_validate(user) if user else None
