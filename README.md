@@ -1,10 +1,6 @@
 # Agente de IA para WhatsApp
 
-Sistema de agente de IA integrado ao WhatsApp por meio da Evolution API, capaz de identificar usuários, armazenar o histórico das conversas, recuperar o contexto automaticamente e gerar respostas utilizando modelos da OpenAI.
-
----
-
-# Visão geral do projeto
+Agente de IA integrado ao WhatsApp via Evolution API. Recebe mensagens por webhook, agrupa mensagens enviadas em sequência (debounce), usa o histórico salvo no banco como contexto e responde com modelos da OpenAI (LangChain).
 
 [![Watch a one-minute video tour of whatsapp-ai-agent](https://gitdiagram.com/video-badge.svg)](https://gitdiagram.com/devthayron/whatsapp-ai-agent/video)
 
@@ -12,191 +8,71 @@ Sistema de agente de IA integrado ao WhatsApp por meio da Evolution API, capaz d
 
 # Funcionalidades
 
-* Integração entre WhatsApp, Evolution API, OpenAI e banco de dados
-* Recebimento e processamento de mensagens via webhook
-* Identificação automática de usuários
-* Armazenamento persistente das mensagens recebidas e enviadas
-* Recuperação de contexto a partir do histórico salvo no banco
-* Geração de respostas contextualizadas utilizando modelos da OpenAI (via LangChain)
+* Webhook protegido por segredo (`X-Webhook-Secret`)
+* Identificação automática de usuários pelo número
+* Histórico persistente no PostgreSQL (contexto das últimas 30 mensagens)
+* Debounce com Redis: mensagens em sequência geram uma única resposta
+* Worker com concorrência, lease e novas tentativas
 * Controle de mensagens duplicadas
-* Envio automático das respostas pelo WhatsApp
-* Sistema de logs estruturado (console e arquivo)
-* Testes automatizados com Pytest
+* Fallback de resposta direta se o Redis estiver fora do ar
+* Autenticação JWT: access token no corpo e refresh token em cookie `HttpOnly`
+* CORS configurável para o front-end
+* API documentada no Swagger, com formato das respostas e dos erros
+* Migrações com Alembic
+* Logs em console e arquivo (sem conteúdo das mensagens)
+* Testes com Pytest
 
 ---
 
-# Memória das conversas
-
-Quando um usuário envia uma mensagem:
-
-1. A mensagem chega pelo WhatsApp através da Evolution API.
-2. O sistema identifica (ou cria) o usuário pelo número do telefone.
-3. A mensagem recebida é salva no banco de dados.
-4. As últimas mensagens da conversa (limite de 30) são recuperadas do banco, em ordem cronológica.
-5. Esse histórico é enviado ao modelo de IA como contexto.
-6. A resposta gerada é salva no banco e enviada ao usuário pelo WhatsApp.
-
-> O contexto é construído **exclusivamente** com as mensagens que passaram pela aplicação.
-
----
-
-# Fluxo da aplicação
+# Fluxo
 
 ```text
-WhatsApp
-    │
-    ▼
-Evolution API
-    │
-    ▼
-Webhook
-    │
-    ▼
-Processamento da mensagem
-    │
-    ▼
-Identificar/criar usuário
-    │
-    ▼
-Salvar mensagem recebida
-    │
-    ▼
-Recuperar histórico do banco
-    │
-    ▼
-Agente de IA (LangChain)
-    │
-    ▼
-Modelo OpenAI
-    │
-    ▼
-Gerar resposta
-    │
-    ▼
-Salvar resposta no banco de dados
-    │
-    ▼
-Enviar resposta no WhatsApp
+WhatsApp → Evolution API → Webhook → Parser
+    → Identificar/criar usuário → Salvar mensagem (PostgreSQL)
+    → Janela de debounce (Redis) → Worker
+    → Histórico → IA (OpenAI) → Enviar no WhatsApp → Salvar resposta
 ```
+
+Só são processadas mensagens de **texto** em **conversas individuais**. Grupos, áudios, imagens, figurinhas, reações e mensagens enviadas pela própria conta são ignorados.
 
 ---
 
-# Estrutura do projeto
+# Estrutura
 
 ```text
 whatsapp-ai-agent/
-├── app/                              # aplicação FastAPI
-│   ├── main.py
-│   ├── routes/
-│   │   ├── chat.py
-│   │   └── webhook_evolution.py
-│   └── schemas/
-│       └── chat.py
-│
-├── agent/                            # agente de IA
-│   ├── model.py
-│   ├── processor.py
-│   └── prompt.py
-│
+├── app/
+│   ├── main.py                  # app, CORS, rotas e worker
+│   ├── worker.py                # worker de debounce
+│   ├── routes/                  # auth, chat, webhook_evolution
+│   └── schemas/                 # message, user, responses
+├── agent/                       # model, processor, prompt
+├── cache/                       # client (Redis), debounce
+├── core/security.py             # criação de tokens JWT
 ├── integrations/
-│   └── evolution/                    # integração com a Evolution API
-│       ├── client.py
-│       └── parser.py
-│
-├── database/                         # persistência e modelos
-│   ├── connection.py
-│   ├── models.py
-│   ├── users.py
-│   └── conversations.py
-│
-├── tests/                            # testes automatizados
-│   ├── conftest.py
-│   ├── test_agent.py
-│   ├── test_conversations.py
-│   ├── test_evolution_parser.py
-│   ├── test_routes.py
-│   └── test_users.py
-│
-├── docs/
-│   └── dev.md
-│
-├── data/
-│   └── conversations.db
-│
-├── logs/
-│   └── app.log
-│
+│   ├── messaging.py             # seleção do provedor
+│   └── evolution/               # client, parser, setup_webhook
+├── database/                    # base, connection, models, users, conversations
+├── migrations/                  # Alembic
+├── tests/                       # agent, auth, conversations, parser, routes, users, worker
+├── docs/                        # dev, database, api
 ├── config.py
+├── dependencies.py              # sessão e autenticação
 ├── logger.py
-├── pytest.ini
-├── requirements.txt
-└── README.md
+└── requirements.txt
 ```
 
 ---
 
 # Tecnologias
 
-* Python 3.12
-* FastAPI
-* LangChain
-* OpenAI API
-* Evolution API
-* SQLAlchemy
-* SQLite
+Python 3.12 · FastAPI · LangChain · OpenAI · Evolution API · SQLAlchemy · PostgreSQL · Redis · Alembic · PyJWT · Pytest
 
 ---
 
 # Aviso
 
-> **Importante:** este projeto utiliza a Evolution API para integração com o WhatsApp. O uso de automações pode violar os Termos de Serviço do WhatsApp e resultar em restrições ou banimento da conta utilizada.
-
-Para ambientes de produção, avalie o uso da API oficial do WhatsApp quando aplicável.
-
----
-
-# Banco de dados
-
-SQLite é utilizado inicialmente para armazenar usuários e histórico das conversas.
-
-```text
-data/
-└── conversations.db
-```
-
-> As tabelas são criadas automaticamente na inicialização (`create_all`), que **não altera** tabelas já existentes. Ao mudar o schema em `database/models.py`, apague `data/conversations.db` (ou aplique a migração manualmente) em ambiente de desenvolvimento.
-
----
-
-# Tabelas
-
-## Usuários (`users`)
-
-| Campo  | Descrição               |
-| ------ | ------------------------- |
-| id     | Identificador do usuário |
-| name   | Nome do contato           |
-| number | Número do WhatsApp       |
-
----
-
-## Mensagens (`messages`)
-
-| Campo        | Descrição                                    |
-| ------------ | ---------------------------------------------- |
-| id           | Identificador interno                          |
-| message_id   | Identificador único da mensagem               |
-| user_id      | Usuário relacionado                           |
-| role         | Origem da mensagem (`user` ou `assistant`) |
-| content      | Conteúdo da mensagem                          |
-| message_type | Tipo da mensagem                               |
-| sent_at      | Data e hora da mensagem                        |
-
----
-
-# Logging
-
-Logs são registrados no console e em `logs/app.log`, com nível controlado pela variável `LOG_LEVEL` (padrão: `INFO`). Por privacidade, o conteúdo das mensagens nunca é registrado.
+> A Evolution API não é oficial. O uso de automações pode violar os Termos de Serviço do WhatsApp e resultar em banimento da conta. Em produção, avalie a API oficial (Meta). O provedor é selecionado por `MESSAGING_PROVIDER`, o que facilita a troca.
 
 ---
 
@@ -204,79 +80,98 @@ Logs são registrados no console e em `logs/app.log`, com nível controlado pela
 
 ```bash
 git clone https://github.com/devthayron/whatsapp-ai-agent.git
-
 cd whatsapp-ai-agent
-
 python -m venv venv
-
-source venv/bin/activate            # linux/mac
-
-# venv\Scripts\activate             # Windows
-
+source venv/bin/activate        # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+cp .env.example .env
+```
+
+É necessário ter PostgreSQL e Redis disponíveis. Veja [docs/dev.md](docs/dev.md).
+
+---
+
+# Variáveis de ambiente
+
+## Obrigatórias
+
+| Variável       | Descrição                                                    |
+| -------------- | ------------------------------------------------------------ |
+| BASE_URL       | Endereço da Evolution API                                    |
+| INSTANCE       | Nome da instância do WhatsApp                                |
+| API_KEY_EVO    | Chave da Evolution API                                       |
+| WEBHOOK_URL    | URL pública do webhook (ex.: `https://xxxx.ngrok-free.app/webhook/`) |
+| WEBHOOK_SECRET | Segredo enviado no header `X-Webhook-Secret`                 |
+| SECRET_KEY     | Chave de assinatura dos tokens JWT (mínimo 32 caracteres)    |
+| OPENAI_API_KEY | Chave da OpenAI                                              |
+| DATABASE_URL   | URL do PostgreSQL (`postgresql+psycopg://user:senha@host:5432/db`) |
+
+## Opcionais
+
+| Variável                    | Padrão                     | Descrição                                        |
+| --------------------------- | -------------------------- | ------------------------------------------------ |
+| AI_PROVIDER                 | `openai`                   | Provedor do modelo                               |
+| AI_MODEL                    | `gpt-5.4-nano`             | Modelo                                           |
+| LOG_LEVEL                   | `DEBUG`                    | Nível de log                                     |
+| ALGORITHM                   | `HS256`                    | Algoritmo do JWT                                 |
+| ACCESS_TOKEN_EXPIRE_MINUTES | `30`                       | Validade do access token                         |
+| REFRESH_TOKEN_EXPIRE_DAYS   | `7`                        | Validade do refresh token e do cookie            |
+| COOKIE_SECURE               | `false`                    | `true` em produção (cookie só por HTTPS)         |
+| COOKIE_SAMESITE             | `lax`                      | `lax`, `strict` ou `none` (`none` exige `COOKIE_SECURE=true`) |
+| COOKIE_DOMAIN               | vazio                      | Domínio do cookie (ex.: `.exemplo.com`)          |
+| CORS_ORIGINS                | `http://localhost:3000`    | Origens do front liberadas, separadas por vírgula|
+| REDIS_URL                   | `redis://localhost:6379/0` | Endereço do Redis                                |
+| DEBOUNCE_SECONDS            | `7`                        | Janela para agrupar mensagens                    |
+| DEBOUNCE_LEASE_SECONDS      | `120`                      | Tempo máximo de retenção do usuário pelo worker  |
+| DEBOUNCE_RETRY_SECONDS      | `15`                       | Intervalo entre tentativas                       |
+| DEBOUNCE_MAX_ATTEMPTS       | `3`                        | Máximo de tentativas por ciclo                   |
+| WORKER_IN_API               | `true`                     | Executa o worker dentro da API                   |
+| WORKER_CONCURRENCY          | `10`                       | Usuários processados em paralelo                 |
+| MESSAGING_PROVIDER          | `evolution`                | Provedor de mensagens                            |
+
+Gerar uma `SECRET_KEY` segura:
+
+```bash
+python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
 ---
 
-# Configuração
+# Documentação
 
-Renomeie o `.env.example` para `.env` e preencha:
+| Documento                            | Conteúdo                                                  |
+| ------------------------------------ | --------------------------------------------------------- |
+| [docs/dev.md](docs/dev.md)           | Ambiente local, execução, webhook, worker e front         |
+| [docs/database.md](docs/database.md) | Tabelas, campos, índices e migrações                      |
+| [docs/api.md](docs/api.md)           | Rotas, Swagger, tipos e uso dos tokens                    |
 
-```env
-OPENAI_API_KEY=sua_chave
-BASE_URL=http://seu-servidor-evolution:8080
-INSTANCE=nome_da_instancia
-API_KEY_EVO=sua_api_key
-LOG_LEVEL=INFO
-AI_PROVIDER=openai
-AI_MODEL=gpt-5.4-nano
-```
-
-## Variáveis de ambiente
-
-| Variável      | Descrição                                      |
-| -------------- | ------------------------------------------------ |
-| OPENAI_API_KEY | Chave da OpenAI                                  |
-| BASE_URL       | Endereço da Evolution API                       |
-| INSTANCE       | Nome da instância do WhatsApp                   |
-| API_KEY_EVO    | Chave de autenticação da Evolution API         |
-| LOG_LEVEL      | Nível de log (`INFO`, `DEBUG`...)           |
-| AI_PROVIDER    | Provedor do modelo (opcional, padrão`openai`) |
-| AI_MODEL       | Modelo utilizado (opcional, padrão`gpt-5.4-nano`)    |
-
----
-
-# Executando
-
-As instruções para executar a aplicação e a configuração do ambiente de desenvolvimento estão disponíveis na:
-
-[Documentação de desenvolvimento](docs/dev.md)
+Swagger: `http://localhost:8000/docs`
 
 ---
 
 # Testes
 
-O projeto possui testes automatizados utilizando **Pytest**.
-
-Para executar todos os testes:
-
 ```bash
 python -m pytest -v
 ```
+
+Usam SQLite em memória e mocks para IA, Redis e Evolution API. Não precisam de serviços externos.
 
 ---
 
 # Próximos passos
 
+* Rota para consultar o histórico de conversas
 * RAG com documentos
-* Migração para PostgreSQL
-* Dockerização da aplicação
+* Docker
 * Dashboard administrativo
-* Suporte a múltiplos modelos de IA
+* Múltiplos modelos de IA
+* API oficial do WhatsApp (Meta)
+* Áudio e imagem
 * Memória de longo prazo
 
 ---
 
 # Autor
 
-- **Thayron Higlânder** – [LinkedIn](https://www.linkedin.com/in/thayron-higlander)
+**Thayron Higlânder** – [LinkedIn](https://www.linkedin.com/in/thayron-higlander)

@@ -1,7 +1,7 @@
 from collections.abc import Generator
 
 import jwt
-from fastapi import Depends, HTTPException
+from fastapi import Cookie, Depends, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from pwdlib import PasswordHash
 from sqlalchemy.orm import Session
@@ -13,6 +13,8 @@ from database.models import Account
 password_hasher = PasswordHash.recommended()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login-oauth2")
+
+REFRESH_COOKIE = "refresh_token"
 
 
 def get_session() -> Generator[Session, None, None]:
@@ -74,8 +76,18 @@ def verify_token(
     return verify_token_type(token, session, "access")
 
 
+def get_refresh_token_from_cookie(
+    refresh_token: str | None = Cookie(default=None),
+) -> str:
+    """Lê o refresh token do cookie HttpOnly (o nome do parâmetro é o nome do cookie)."""
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="Refresh token ausente")
+
+    return refresh_token
+
+
 def verify_refresh_token(
-    token: str = Depends(oauth2_scheme),
+    token: str = Depends(get_refresh_token_from_cookie),
     session: Session = Depends(get_session),  # noqa: B008
 ) -> Account:
     return verify_token_type(token, session, "refresh")

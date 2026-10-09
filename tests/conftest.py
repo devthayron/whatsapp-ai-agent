@@ -6,7 +6,7 @@ os.environ.setdefault("INSTANCE", "test-instance")
 os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
 os.environ.setdefault("WEBHOOK_URL", "http://localhost/webhook/")
 os.environ.setdefault("WEBHOOK_SECRET", "test-webhook-secret")
-os.environ.setdefault("SECRET_KEY", "test-secret-key")
+os.environ.setdefault("SECRET_KEY", "test-secret-key-with-at-least-32-bytes")
 # Forçado: os testes nunca podem apontar para o Postgres real
 os.environ["DATABASE_URL"] = "sqlite://"
 
@@ -16,7 +16,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import database.models  # noqa: F401  (registra as tabelas no Base)
-from database.connection import Base
+from database.base import Base
 
 
 @pytest.fixture
@@ -35,6 +35,8 @@ def db_session(monkeypatch):
 
     monkeypatch.setattr("database.users.SessionLocal", TestingSessionLocal)
     monkeypatch.setattr("database.conversations.SessionLocal", TestingSessionLocal)
+    # get_session (autenticação e rotas) também usa o banco de teste
+    monkeypatch.setattr("dependencies.SessionLocal", TestingSessionLocal)
 
     session = TestingSessionLocal()
     try:
