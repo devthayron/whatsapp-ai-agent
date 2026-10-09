@@ -78,6 +78,14 @@ def process_conversation(message: MessageReceived, send_msg=None) -> dict:
     return respond_to_user(user, send_msg)
 
 
+def _failed(response: str, retry: bool = False) -> dict:
+    """
+    retry=True só quando o usuário não recebeu nada. Se algo já foi entregue
+    (resposta ou fallback), repetir o processamento duplicaria a mensagem.
+    """
+    return {"status": "failed", "response": response, "retry": retry}
+
+
 def respond_to_user(user: UserSchema, send_msg=None) -> dict:
     """Lê o histórico no PostgreSQL, chama a IA, envia e grava a resposta."""
     start = time.monotonic()
@@ -87,26 +95,30 @@ def respond_to_user(user: UserSchema, send_msg=None) -> dict:
         response = generate_response(history)
     except Exception:
         logger.exception("Falha ao gerar resposta da IA | number=%s", user.number)
+        fallback_sent = False
         if send_msg:
             try:
                 send_msg(ERROR_MESSAGE)
+                fallback_sent = True
             except Exception:
                 logger.exception("Falha ao enviar fallback | number=%s", user.number)
-        return {"status": "failed", "response": ERROR_MESSAGE}
+        # Fallback entregue: fim. Sem entrega, o usuário ficou sem nada.
+        return _failed(ERROR_MESSAGE, retry=bool(send_msg) and not fallback_sent)
 
     if send_msg:
         try:
             send_msg(response)
         except Exception:
             logger.exception("Falha ao enviar resposta | number=%s", user.number)
-            return {"status": "failed", "response": response}
+            # Nada foi entregue nem gravado: seguro repetir.
+            return _failed(response, retry=True)
 
     try:
         save_assistant_message(user.id, response)
     except Exception:
-        # Já foi enviada: não propagar, senão o retry do lease reenviaria.
+        # Já foi enviada: não repetir, senão o usuário recebe duas vezes.
         logger.exception("Resposta enviada mas não gravada | number=%s", user.number)
-        return {"status": "failed", "response": response}
+        return _failed(response)
 
     logger.info(
         "Processamento concluído | number=%s | tempo=%.2fs",

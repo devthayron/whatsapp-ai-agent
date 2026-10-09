@@ -5,7 +5,9 @@ from database.conversations import (
     TIMEZONE,
     get_message_history,
     message_exists,
-    save_conversation,
+    save_assistant_message,
+    save_user_message,
+    timestamp_to_datetime,
 )
 from database.models import Message
 from database.users import get_or_create_user
@@ -26,22 +28,44 @@ def _user(number="5511999999999"):
     return get_or_create_user(number, "Fulano")
 
 
-def test_save_conversation_is_atomic(db_session):
+def _exchange(user_id, external_id, content, reply):
+    save_user_message(_user_message(user_id, external_id, content))
+    save_assistant_message(user_id, reply)
+
+
+def test_save_user_message_returns_schema_with_id(db_session):
     user = _user()
 
-    assert save_conversation(_user_message(user.id), "olá") is True
-    # mesmo external_id
-    assert save_conversation(_user_message(user.id), "olá de novo") is False
+    saved = save_user_message(_user_message(user.id))
 
-    roles = [m.role for m in db_session.query(Message).order_by(Message.id)]
-    assert roles == ["user", "assistant"]  # a segunda tentativa não deixou lixo
+    assert isinstance(saved, MessageSchema)
+    assert saved.id is not None
+    assert saved.role == "user"
+
+
+def test_save_user_message_duplicate_returns_none(db_session):
+    user = _user()
+
+    assert save_user_message(_user_message(user.id)) is not None
+    assert save_user_message(_user_message(user.id)) is None
+
+    assert db_session.query(Message).count() == 1
+
+
+def test_save_assistant_message(db_session):
+    user = _user()
+
+    save_assistant_message(user.id, "olá")
+
+    row = db_session.query(Message).one()
+    assert (row.role, row.content, row.external_id) == ("assistant", "olá", None)
 
 
 def test_message_exists(db_session):
     user = _user()
 
     assert message_exists("evolution_M1") is False
-    save_conversation(_user_message(user.id), "olá")
+    save_user_message(_user_message(user.id))
     assert message_exists("evolution_M1") is True
 
 
@@ -51,8 +75,8 @@ def test_message_exists_none_is_false(db_session):
 
 def test_history_returns_message_schemas_in_order(db_session):
     user = _user()
-    save_conversation(_user_message(user.id, "evolution_M1", "primeira"), "r1")
-    save_conversation(_user_message(user.id, "evolution_M2", "segunda"), "r2")
+    _exchange(user.id, "evolution_M1", "primeira", "r1")
+    _exchange(user.id, "evolution_M2", "segunda", "r2")
 
     history = get_message_history(user.id)
 
@@ -64,7 +88,7 @@ def test_history_returns_message_schemas_in_order(db_session):
 def test_history_respects_limit(db_session):
     user = _user()
     for i in range(3):
-        save_conversation(_user_message(user.id, f"evolution_M{i}", f"msg{i}"), f"r{i}")
+        _exchange(user.id, f"evolution_M{i}", f"msg{i}", f"r{i}")
 
     history = get_message_history(user.id, limit=2)
 
@@ -74,6 +98,16 @@ def test_history_respects_limit(db_session):
 def test_history_is_isolated_per_user(db_session):
     user = _user("5511900000000")
     other = _user("5511911111111")
-    save_conversation(_user_message(user.id), "olá")
+    _exchange(user.id, "evolution_M1", "oi", "olá")
 
     assert get_message_history(other.id) == []
+
+
+def test_timestamp_to_datetime():
+    assert timestamp_to_datetime(None) is None
+
+    converted = timestamp_to_datetime(1710000000)
+    assert converted.tzinfo == TIMEZONE
+
+    now = datetime.now(TIMEZONE)
+    assert timestamp_to_datetime(now) is now

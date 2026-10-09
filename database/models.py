@@ -9,7 +9,7 @@ class User(Base):
 
     id = Column(Integer, primary_key=True)
     name = Column(String, nullable=True)
-    number = Column(String(13), unique=True, nullable=False, index=True)
+    number = Column(String(20), unique=True, nullable=False, index=True)
 
     messages = relationship(
         "Message",
@@ -38,5 +38,5 @@ class Message(Base):
     role = Column(String, nullable=False)
     content = Column(String, nullable=False)
     content_type = Column(String, nullable=False)
-    sent_at = Column(DateTime, nullable=False, index=True)
+    sent_at = Column(DateTime(timezone=True), nullable=False, index=True)
     user = relationship("User", back_populates="messages")

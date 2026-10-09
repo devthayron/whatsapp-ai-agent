@@ -17,33 +17,51 @@ ERROR_BACKOFF = 5
 DRAIN_TIMEOUT = 30
 
 
-def _respond(user_id: int) -> None:
-    """Código síncrono (PG, IA, envio de mensagem): roda em thread."""
+def _respond(user_id: int) -> bool:
+    """
+    Código síncrono (PG, IA, envio de mensagem): roda em thread.
+    Retorna True se o trabalho terminou (ack) e False se deve tentar de novo.
+    """
     user = get_user_by_id(user_id)
-    if user:
-        respond_to_user(
-            user, lambda text: messaging_service.send_message(user.number, text)
+    if not user:
+        return True
+
+    result = respond_to_user(
+        user, lambda text: messaging_service.send_message(user.number, text)
+    )
+    return not result.get("retry", False)
+
+
+async def _retry(user_id: int, lease: float) -> None:
+    attempts = await debounce.retry(user_id, lease)
+
+    if attempts > 0:
+        logger.warning(
+            "Nova tentativa agendada | user_id=%s | tentativas=%s",
+            user_id,
+            attempts,
         )
+    elif attempts == 0:
+        logger.error("Tentativas esgotadas, descartando | user_id=%s", user_id)
+    else:
+        logger.debug("Retry ignorado, chegou mensagem nova | user_id=%s", user_id)
 
 
 async def _process(user_id: int, lease: float) -> None:
     try:
-        await asyncio.to_thread(_respond, user_id)
+        done = await asyncio.to_thread(_respond, user_id)
     except Exception:
-        # Sem ack: o lease expira e outro worker poderá tentar novamente.
-        logger.exception(
-            "Erro ao processar debounce | user_id=%s",
-            user_id,
-        )
-        return
+        logger.exception("Erro ao processar debounce | user_id=%s", user_id)
+        done = False
 
     try:
-        await debounce.ack(user_id, lease)
+        if done:
+            await debounce.ack(user_id, lease)
+        else:
+            await _retry(user_id, lease)
     except RedisError:
-        logger.exception(
-            "Erro ao confirmar debounce | user_id=%s",
-            user_id,
-        )
+        # Sem ack/retry: o lease expira e outro ciclo reivindica.
+        logger.exception("Erro ao confirmar debounce | user_id=%s", user_id)
 
 
 async def run(stop: asyncio.Event) -> None:
