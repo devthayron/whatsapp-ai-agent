@@ -64,10 +64,10 @@ Contatos do WhatsApp, criados na primeira mensagem de um número.
 | Campo  | Tipo          | Nulo | Chave           | Descrição                                   |
 | ------ | ------------- | ---- | --------------- | ------------------------------------------- |
 | id     | `INTEGER`     | Não  | PK              | Identificador                               |
-| name   | `VARCHAR`     | Sim  | —               | Nome do contato (`pushName`)                |
+| name   | `VARCHAR`     | Sim  | —               | Nome do contato (nome do perfil no WhatsApp) |
 | number | `VARCHAR(20)` | Não  | Único, indexado | Número só com dígitos (`5511999999999`)     |
 
-* O sufixo `@s.whatsapp.net` é removido antes de salvar.
+* O número vem do campo `from` da Cloud API, que já é só dígitos.
 * Se chegar um nome diferente, `name` é atualizado; nome vazio mantém o atual.
 * Excluir um usuário exclui suas mensagens (cascade).
 
@@ -80,7 +80,7 @@ Histórico: mensagens do usuário e respostas da IA.
 | Campo        | Tipo          | Nulo | Chave                      | Descrição                                         |
 | ------------ | ------------- | ---- | -------------------------- | ------------------------------------------------- |
 | id           | `INTEGER`     | Não  | PK                         | Identificador (define a ordem do histórico)       |
-| external_id  | `VARCHAR`     | Sim  | Único, indexado            | Id no provedor, ex.: `evolution_3EB0A1B2C3`       |
+| external_id  | `VARCHAR`     | Sim  | Único, indexado            | Id no provedor, ex.: `meta_wamid.HBgM...`         |
 | user_id      | `INTEGER`     | Não  | FK → `users.id`, indexado  | Dono da conversa                                  |
 | role         | `VARCHAR`     | Não  | —                          | `user` ou `assistant`                             |
 | content      | `VARCHAR`     | Não  | —                          | Texto                                             |
@@ -89,7 +89,7 @@ Histórico: mensagens do usuário e respostas da IA.
 
 Regras:
 
-* **Duplicidade:** `external_id` único impede gravar a mesma mensagem duas vezes. O prefixo (`evolution_`) evita colisão entre provedores.
+* **Duplicidade:** `external_id` único impede gravar a mesma mensagem duas vezes (a Meta pode reenviar o mesmo evento). O prefixo (`meta_`) evita colisão entre provedores; registros antigos com `evolution_` continuam válidos.
 * **Sem id do provedor:** `external_id` fica `NULL` e não há deduplicação. Respostas da IA também usam `NULL`.
 * **`sent_at`:** usa o timestamp da mensagem, ou o horário atual se não houver. Valores numéricos são convertidos para `America/Sao_Paulo`.
 * **Resposta da IA** só é salva depois de enviada.
@@ -159,8 +159,7 @@ Não guarda conversas, só coordena o debounce. Se for limpo, nenhuma mensagem s
 
 Para alterar o schema: edite `database/models.py` → gere a migração → **revise** → aplique → atualize este documento.
 
-
-> Essa migração só altera tabelas existentes. Em um banco vazio, é preciso uma migração base que crie as tabelas.
+> A migração atual só altera tabelas existentes. Em um banco vazio, é preciso uma migração base que crie as tabelas.
 
 ---
 

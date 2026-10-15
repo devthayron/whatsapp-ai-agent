@@ -1,13 +1,6 @@
 import os
 
-# Forçado: os testes sempre partem do provedor padrão, mesmo que o .env use Meta
-os.environ["MESSAGING_PROVIDER"] = "evolution"
-os.environ.setdefault("API_KEY_EVO", "test-key")
-os.environ.setdefault("BASE_URL", "http://evolution-test.local")
-os.environ.setdefault("INSTANCE", "test-instance")
 os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
-os.environ.setdefault("WEBHOOK_URL", "http://localhost/webhook/")
-os.environ.setdefault("WEBHOOK_SECRET", "test-webhook-secret")
 os.environ.setdefault("META_ACCESS_TOKEN", "test-meta-token")
 os.environ.setdefault("META_PHONE_NUMBER_ID", "100000000000001")
 os.environ.setdefault("META_APP_SECRET", "test-meta-app-secret")

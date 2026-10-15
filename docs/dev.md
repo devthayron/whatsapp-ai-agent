@@ -1,12 +1,12 @@
 # Ambiente de desenvolvimento
 
-A API FastAPI, o PostgreSQL e o Redis rodam localmente. O `ngrok` expõe o webhook para a Evolution API (hospedada em uma VPS), que só **recebe** e **envia** mensagens.
+A API FastAPI, o PostgreSQL e o Redis rodam localmente. O `ngrok` expõe o webhook para a Meta, que só **recebe** e **envia** mensagens pela Cloud API.
 
 ```text
-WhatsApp → Evolution API (VPS) → ngrok → FastAPI (local)
-                                            ├─ Redis (debounce)
-                                            ├─ PostgreSQL (histórico)
-                                            └─ OpenAI (respostas)
+WhatsApp → Meta (Cloud API) → ngrok → FastAPI (local)
+                                         ├─ Redis (debounce)
+                                         ├─ PostgreSQL (histórico)
+                                         └─ OpenAI (respostas)
 
 Front-end (navegador) → FastAPI (CORS + cookie do refresh token)
 ```
@@ -18,7 +18,7 @@ Front-end (navegador) → FastAPI (CORS + cookie do refresh token)
 * Python 3.12
 * PostgreSQL e Redis
 * ngrok
-* Instância da Evolution API conectada ao WhatsApp
+* App na Meta com o produto WhatsApp (veja [Configurando a Meta](../README.md#configurando-a-meta))
 * Chave da OpenAI
 
 PostgreSQL e Redis via Docker:
@@ -40,20 +40,17 @@ Copie `.env.example` para `.env`. A lista completa de variáveis está no [READM
 ```env
 DATABASE_URL=postgresql+psycopg://chatbot:SUA_SENHA@localhost:5432/chatbot
 REDIS_URL=redis://localhost:6379/0
-WEBHOOK_URL=https://xxxx.ngrok-free.app/webhook/
-WEBHOOK_SECRET=um-segredo-grande-e-aleatorio
 SECRET_KEY=uma-chave-com-pelo-menos-32-caracteres
+
+META_ACCESS_TOKEN=...
+META_PHONE_NUMBER_ID=...
+META_APP_SECRET=...
+META_VERIFY_TOKEN=...
 
 # Front-end e cookie do refresh token
 CORS_ORIGINS=http://localhost:3000
 COOKIE_SECURE=false
 COOKIE_SAMESITE=lax
-```
-
-Gerar uma `SECRET_KEY` segura:
-
-```bash
-python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
 ---
@@ -77,7 +74,7 @@ Revise a migração gerada antes de aplicar. Detalhes em [database.md](database.
 
 # Executando
 
-**Terminal 1 — API**
+**Terminal 1: API**
 
 ```bash
 uvicorn app.main:app --reload
@@ -85,21 +82,23 @@ uvicorn app.main:app --reload
 
 Swagger em `http://localhost:8000/docs`.
 
-**Terminal 2 — ngrok**
+**Terminal 2: ngrok**
 
 ```bash
 ngrok http 8000
 ```
 
-A URL do ngrok muda a cada execução (conforme o plano). Quando mudar, atualize `WEBHOOK_URL` no `.env`.
+**Cadastro do webhook na Meta**
 
-**Terminal 3 — configurar o webhook (sempre que a URL mudar)**
+No painel do app (WhatsApp → Configuration → Webhook), informe:
 
-```bash
-python -m integrations.evolution.setup_webhook
-```
+* Callback URL: `https://xxxx.ngrok-free.app/webhook/meta`
+* Verify token: o valor de `META_VERIFY_TOKEN`
+* Assine o campo `messages`
 
-Registra o webhook para o evento `MESSAGES_UPSERT` com o header `X-Webhook-Secret`. Requisições sem o segredo correto recebem `401`.
+A Meta chama `GET /webhook/meta` para verificar. A API precisa estar no ar **antes** de clicar em "Verify and save".
+
+A URL do ngrok muda a cada execução (conforme o plano). Quando mudar, atualize a Callback URL no painel. Não há script de cadastro: na Meta, isso é feito só pelo painel.
 
 ---
 
@@ -129,7 +128,6 @@ Comportamento:
 A IA recebe as últimas **30 mensagens** (usuário + IA) do banco.
 
 * Usuário novo começa sem contexto.
-* Mensagens enviadas pelo celular da própria conta (`fromMe`) não são salvas.
 * A mensagem de erro padrão enviada quando a IA falha não entra no histórico.
 * Para testar: envie `"meu nome é João"` e depois `"qual é meu nome?"`.
 * Para recomeçar, apague as mensagens do usuário (ou o banco).
@@ -166,13 +164,26 @@ Erros comuns ao enviar o JSON pelo Swagger:
 
 ---
 
+# Problemas comuns com a Meta
+
+| Sintoma                                        | Causa provável                                                                 |
+| ---------------------------------------------- | ------------------------------------------------------------------------------ |
+| "Verify and save" falha                        | API fora do ar, URL errada (falta `/webhook/meta`) ou `META_VERIFY_TOKEN` diferente |
+| Mensagens não chegam                           | Campo `messages` não assinado, ou ngrok com URL antiga                         |
+| `401` no webhook                               | `META_APP_SECRET` errado (a assinatura não confere)                            |
+| Para de responder depois de ~24h               | Token temporário do painel expirou: use o token do System User                 |
+| Erro ao enviar para um número                  | Número de teste: o destinatário precisa estar cadastrado no painel             |
+| Erro ao enviar depois de um tempo sem conversa | Janela de 24h expirada (texto livre só vale dentro dela)                       |
+
+---
+
 # Testes
 
 ```bash
 python -m pytest -v
 ```
 
-SQLite em memória e mocks de IA, Redis e Evolution API. Cobrem parser, usuários, conversas, agente, autenticação (login, refresh por cookie, logout), rotas e worker.
+SQLite em memória e mocks de IA, Redis e Meta. Cobrem parser, usuários, conversas, agente, autenticação (login, refresh por cookie, logout), rotas, webhook da Meta e worker.
 
 O `conftest.py` força `DATABASE_URL=sqlite://` e usa o banco de teste também em `dependencies.SessionLocal`, então os testes nunca tocam o PostgreSQL real.
 
@@ -188,10 +199,10 @@ Console e `logs/app.log`. Controlados por `LOG_LEVEL` (padrão `DEBUG`; use `INF
 
 # Produção
 
-* Domínio próprio com HTTPS (sem ngrok)
+* Domínio próprio com HTTPS (sem ngrok) e Callback URL atualizada no painel da Meta
+* Token permanente de System User em `META_ACCESS_TOKEN`
 * `COOKIE_SECURE=true`, `CORS_ORIGINS` com o endereço real do front e front e API no mesmo site
 * `WORKER_IN_API=false`, com o worker em processo separado
-* `SECRET_KEY` (32+ caracteres) e `WEBHOOK_SECRET` longos e aleatórios
+* `SECRET_KEY` (32+ caracteres) longa e aleatória
 * `LOG_LEVEL=INFO`
 * PostgreSQL com backup; Redis e banco com acesso restrito
-* Avaliar a API oficial do WhatsApp (Meta)

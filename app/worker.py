@@ -8,7 +8,7 @@ from agent.processor import respond_to_user
 from cache import debounce
 from config import settings
 from database.users import get_user_by_id
-from integrations.messaging import messaging_service
+from integrations.meta.client import meta_service
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,7 @@ def _respond(user_id: int) -> bool:
         return True
 
     result = respond_to_user(
-        user, lambda text: messaging_service.send_message(user.number, text)
+        user, lambda text: meta_service.send_message(user.number, text)
     )
     return not result.get("retry", False)
 

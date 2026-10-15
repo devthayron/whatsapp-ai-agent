@@ -43,11 +43,12 @@ Guia para quem consome a API (front-end, integrações e ferramentas de IA). A d
 
 ## Auxiliares e internas
 
-| Método | Rota                 | Autenticação       | Uso                                              |
-| ------ | -------------------- | ------------------ | ------------------------------------------------ |
-| GET    | `/`                  | —                  | Verifica se a API está no ar                     |
-| POST   | `/auth/login-oauth2` | —                  | Login do botão Authorize do Swagger (sem cookie) |
-| POST   | `/webhook/`          | `X-Webhook-Secret` | **Uso interno** (Evolution API). Não use no front|
+| Método   | Rota                 | Autenticação            | Uso                                              |
+| -------- | -------------------- | ----------------------- | ------------------------------------------------ |
+| GET      | `/`                  | —                       | Verifica se a API está no ar                     |
+| POST     | `/auth/login-oauth2` | —                       | Login do botão Authorize do Swagger (sem cookie) |
+| GET      | `/webhook/meta`      | `hub.verify_token`      | **Uso interno** (Meta). Handshake de cadastro    |
+| POST     | `/webhook/meta`      | `X-Hub-Signature-256`   | **Uso interno** (Meta). Não use no front         |
 
 ---
 
@@ -279,19 +280,33 @@ Mesmo login, em formulário (`application/x-www-form-urlencoded`) com `username`
 
 ---
 
-## POST `/webhook/` (uso interno)
+## GET `/webhook/meta` (uso interno)
 
-Chamada pela Evolution API, não pelo front. Configurada com `python -m integrations.evolution.setup_webhook`.
+Handshake chamado pela Meta ao cadastrar o webhook no painel. Não use no front.
 
-Header: `X-Webhook-Secret: <WEBHOOK_SECRET>` · Corpo: evento `messages.upsert`.
+Query: `hub.mode=subscribe`, `hub.verify_token` e `hub.challenge`.
 
-| Status | Quando                                                 |
-| ------ | ------------------------------------------------------ |
-| 200    | Mensagem enfileirada ou evento ignorado (corpo vazio)  |
-| 401    | Segredo ausente ou incorreto                           |
-| 500    | Erro inesperado ao enfileirar                          |
+| Status | Quando                                                                   |
+| ------ | ------------------------------------------------------------------------ |
+| 200    | `hub.verify_token` igual a `META_VERIFY_TOKEN`: devolve o `hub.challenge` em texto puro |
+| 403    | Token incorreto, `hub.mode` diferente de `subscribe` ou parâmetros ausentes |
 
-Ignorados com `200`: outros eventos, `fromMe`, grupos, mensagens que não são texto e duplicadas. A resposta ao usuário não vai no corpo: o worker a envia pela Evolution API quando a janela de debounce vence.
+---
+
+## POST `/webhook/meta` (uso interno)
+
+Chamada pela Meta (WhatsApp Cloud API), não pelo front. O endereço é cadastrado no painel do app, em WhatsApp → Configuration → Webhook, com o campo `messages` assinado.
+
+Header: `X-Hub-Signature-256: sha256=<HMAC-SHA256 do corpo bruto com META_APP_SECRET>` · Corpo: evento da Cloud API.
+
+| Status | Quando                                                              |
+| ------ | ------------------------------------------------------------------- |
+| 200    | Mensagem enfileirada ou evento ignorado                             |
+| 400    | Corpo que não é um JSON de objeto                                   |
+| 401    | Assinatura ausente ou incorreta                                     |
+| 500    | Erro ao enfileirar alguma mensagem (a Meta tenta reenviar o evento) |
+
+Ignorados com `200`: eventos de status (entregue, lida), números diferentes de `META_PHONE_NUMBER_ID`, mensagens que não são texto e duplicadas. A resposta ao usuário não vai no corpo: o worker a envia pela Cloud API quando a janela de debounce vence.
 
 ---
 
@@ -309,7 +324,6 @@ Observações:
 * Para testar o cookie, execute **POST /auth/login** pelo Swagger: o navegador guarda o cookie e **POST /auth/refresh** passa a funcionar na mesma aba. Isso exige `COOKIE_SECURE=false` em ambiente local sem HTTPS.
 
 ---
-
 
 Exemplo mínimo e válido para `/chat/`:
 
