@@ -107,10 +107,10 @@ Registra o webhook para o evento `MESSAGES_UPSERT` com o header `X-Webhook-Secre
 
 A cada mensagem, a janela do usuário é renovada no Redis. Quando vence (`DEBOUNCE_SECONDS`, padrão 7s), o worker busca o histórico, chama a IA e envia **uma** resposta.
 
-| Modo                   | Configuração           | Comando                         |
-| ---------------------- | ---------------------- | ------------------------------- |
-| Dentro da API (padrão) | `WORKER_IN_API=true`   | `uvicorn app.main:app --reload` |
-| Processo separado      | `WORKER_IN_API=false`  | `python -m app.worker`          |
+| Modo                    | Configuração          | Comando                           |
+| ----------------------- | ----------------------- | --------------------------------- |
+| Dentro da API (padrão) | `WORKER_IN_API=true`  | `uvicorn app.main:app --reload` |
+| Processo separado       | `WORKER_IN_API=false` | `python -m app.worker`          |
 
 O processo separado usa sinais Unix: funciona em Linux/macOS. No Windows, use o modo dentro da API.
 
@@ -157,12 +157,12 @@ Use `POST /chat/` com um access token, direto no Swagger ou por curl. Passo a pa
 
 Erros comuns ao enviar o JSON pelo Swagger:
 
-| Erro                                            | Causa                                                   |
-| ----------------------------------------------- | ------------------------------------------------------- |
-| `json_invalid` / `Expecting property name...`   | Vírgula sobrando depois do último campo, ou aspas curvas/simples |
-| `422` em `number`                               | `number` enviado sem aspas (precisa ser texto)          |
-| `401 Token expirado`                            | O access token dura 30 min: clique em **Authorize** de novo |
-| Mensagem salva com data de 1970                 | `timestamp: 0` (valor de exemplo do Swagger): remova o campo |
+| Erro                                              | Causa                                                              |
+| ------------------------------------------------- | ------------------------------------------------------------------ |
+| `json_invalid` / `Expecting property name...` | Vírgula sobrando depois do último campo, ou aspas curvas/simples |
+| `422` em `number`                             | `number` enviado sem aspas (precisa ser texto)                   |
+| `401 Token expirado`                            | O access token dura 30 min: clique em **Authorize** de novo  |
+| Mensagem salva com data de 1970                   | `timestamp: 0` (valor de exemplo do Swagger): remova o campo     |
 
 ---
 

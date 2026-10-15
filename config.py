@@ -4,19 +4,46 @@ from typing import Literal
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Variáveis exigidas por provedor de mensagens
+PROVIDER_REQUIRED = {
+    "evolution": [
+        "API_KEY_EVO",
+        "BASE_URL",
+        "INSTANCE",
+        "WEBHOOK_URL",
+        "WEBHOOK_SECRET",
+    ],
+    "meta": [
+        "META_ACCESS_TOKEN",
+        "META_PHONE_NUMBER_ID",
+        "META_APP_SECRET",
+        "META_VERIFY_TOKEN",
+    ],
+}
+
 
 class Settings(BaseSettings):
-    API_KEY_EVO: str
-    BASE_URL: str
-    INSTANCE: str
-    WEBHOOK_URL: str
-    WEBHOOK_SECRET: str
-
     SECRET_KEY: str
 
     OPENAI_API_KEY: str
 
     DATABASE_URL: str
+
+    MESSAGING_PROVIDER: str = "meta"
+
+    # Evolution (obrigatórias só com MESSAGING_PROVIDER=evolution)
+    API_KEY_EVO: str | None = None
+    BASE_URL: str | None = None
+    INSTANCE: str | None = None
+    WEBHOOK_URL: str | None = None
+    WEBHOOK_SECRET: str | None = None
+
+    # Meta / WhatsApp Cloud API (obrigatórias só com MESSAGING_PROVIDER=meta)
+    META_ACCESS_TOKEN: str | None = None
+    META_PHONE_NUMBER_ID: str | None = None
+    META_APP_SECRET: str | None = None
+    META_VERIFY_TOKEN: str | None = None
+    META_API_VERSION: str = "v23.0"
 
     AI_PROVIDER: str = "openai"
     AI_MODEL: str = "gpt-5.4-nano"
@@ -44,8 +71,6 @@ class Settings(BaseSettings):
     WORKER_IN_API: bool = True
     WORKER_CONCURRENCY: int = 10
 
-    MESSAGING_PROVIDER: str = "evolution"
-
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -60,6 +85,26 @@ class Settings(BaseSettings):
     def _check_cookie_settings(self):
         if self.COOKIE_SAMESITE == "none" and not self.COOKIE_SECURE:
             raise ValueError("COOKIE_SAMESITE=none exige COOKIE_SECURE=true")
+        return self
+
+    @model_validator(mode="after")
+    def _check_provider_settings(self):
+        required = PROVIDER_REQUIRED.get(self.MESSAGING_PROVIDER)
+
+        if required is None:
+            raise ValueError(
+                f"MESSAGING_PROVIDER inválido: {self.MESSAGING_PROVIDER} "
+                f"(use {', '.join(PROVIDER_REQUIRED)})"
+            )
+
+        missing = [name for name in required if not getattr(self, name)]
+
+        if missing:
+            raise ValueError(
+                f"MESSAGING_PROVIDER={self.MESSAGING_PROVIDER} exige: "
+                f"{', '.join(missing)}"
+            )
+
         return self
 
 

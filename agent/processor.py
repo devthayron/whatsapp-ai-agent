@@ -2,8 +2,6 @@ import logging
 import time
 from datetime import datetime
 
-from redis.exceptions import RedisError
-
 from agent.model import generate_response
 from app.schemas.message import MessageReceived, MessageSchema
 from app.schemas.user import UserSchema
@@ -27,7 +25,7 @@ DUPLICATE = {"status": "duplicate", "response": None}
 
 
 def _ingest(message: MessageReceived):
-    """Salva a mensagem do usuário no PostgreSQL. Retorna (user, None) se duplicada."""
+    """Salva a mensagem do usuário no PostgreSQL. Retorna (None, None) se duplicada."""
     if message_exists(message.external_id):
         logger.info("Mensagem duplicada | external_id=%s", message.external_id)
         return None, None
@@ -62,9 +60,8 @@ def enqueue_message(message: MessageReceived, send_msg=None) -> dict:
     try:
         debounce.schedule(user.id)
         return {"status": "queued", "response": None}
-
-    except RedisError:
-        logger.exception("Redis indisponível, respondendo sem debounce")
+    except Exception:
+        logger.exception("Falha ao agendar debounce, respondendo direto")
         return respond_to_user(user, send_msg)
 
 
@@ -89,12 +86,12 @@ def _failed(response: str, retry: bool = False) -> dict:
 def respond_to_user(user: UserSchema, send_msg=None) -> dict:
     """Lê o histórico no PostgreSQL, chama a IA, envia e grava a resposta."""
     start = time.monotonic()
-    history = get_message_history(user.id)
 
     try:
+        history = get_message_history(user.id)
         response = generate_response(history)
     except Exception:
-        logger.exception("Falha ao gerar resposta da IA | number=%s", user.number)
+        logger.exception("Falha ao gerar resposta | number=%s", user.number)
         fallback_sent = False
         if send_msg:
             try:
@@ -102,7 +99,6 @@ def respond_to_user(user: UserSchema, send_msg=None) -> dict:
                 fallback_sent = True
             except Exception:
                 logger.exception("Falha ao enviar fallback | number=%s", user.number)
-        # Fallback entregue: fim. Sem entrega, o usuário ficou sem nada.
         return _failed(ERROR_MESSAGE, retry=bool(send_msg) and not fallback_sent)
 
     if send_msg:
@@ -110,13 +106,11 @@ def respond_to_user(user: UserSchema, send_msg=None) -> dict:
             send_msg(response)
         except Exception:
             logger.exception("Falha ao enviar resposta | number=%s", user.number)
-            # Nada foi entregue nem gravado: seguro repetir.
             return _failed(response, retry=True)
 
     try:
         save_assistant_message(user.id, response)
     except Exception:
-        # Já foi enviada: não repetir, senão o usuário recebe duas vezes.
         logger.exception("Resposta enviada mas não gravada | number=%s", user.number)
         return _failed(response)
 

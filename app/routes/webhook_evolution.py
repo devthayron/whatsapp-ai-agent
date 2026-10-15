@@ -9,7 +9,7 @@ from integrations.evolution.client import evolution_service
 from integrations.evolution.parser import extract_webhook_message, normalize_message
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/webhook", tags=["Webhook"])
+router = APIRouter(prefix="/webhook/evolution", tags=["Webhook"])
 
 
 @router.post("/")

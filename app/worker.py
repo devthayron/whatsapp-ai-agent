@@ -84,7 +84,7 @@ async def run(stop: asyncio.Event) -> None:
 
         try:
             await asyncio.wait_for(stop.wait(), timeout=wait)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             pass
 
     if tasks:  # o que não terminar volta pelo lease

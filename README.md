@@ -95,39 +95,39 @@ cp .env.example .env
 
 ## Obrigatórias
 
-| Variável       | Descrição                                                    |
-| -------------- | ------------------------------------------------------------ |
-| BASE_URL       | Endereço da Evolution API                                    |
-| INSTANCE       | Nome da instância do WhatsApp                                |
-| API_KEY_EVO    | Chave da Evolution API                                       |
-| WEBHOOK_URL    | URL pública do webhook (ex.: `https://xxxx.ngrok-free.app/webhook/`) |
-| WEBHOOK_SECRET | Segredo enviado no header `X-Webhook-Secret`                 |
-| SECRET_KEY     | Chave de assinatura dos tokens JWT (mínimo 32 caracteres)    |
-| OPENAI_API_KEY | Chave da OpenAI                                              |
-| DATABASE_URL   | URL do PostgreSQL (`postgresql+psycopg://user:senha@host:5432/db`) |
+| Variável      | Descrição                                                            |
+| -------------- | ---------------------------------------------------------------------- |
+| BASE_URL       | Endereço da Evolution API                                             |
+| INSTANCE       | Nome da instância do WhatsApp                                         |
+| API_KEY_EVO    | Chave da Evolution API                                                 |
+| WEBHOOK_URL    | URL pública do webhook (ex.:`https://xxxx.ngrok-free.app/webhook/`) |
+| WEBHOOK_SECRET | Segredo enviado no header`X-Webhook-Secret`                          |
+| SECRET_KEY     | Chave de assinatura dos tokens JWT (mínimo 32 caracteres)             |
+| OPENAI_API_KEY | Chave da OpenAI                                                        |
+| DATABASE_URL   | URL do PostgreSQL (`postgresql+psycopg://user:senha@host:5432/db`)   |
 
 ## Opcionais
 
-| Variável                    | Padrão                     | Descrição                                        |
-| --------------------------- | -------------------------- | ------------------------------------------------ |
-| AI_PROVIDER                 | `openai`                   | Provedor do modelo                               |
-| AI_MODEL                    | `gpt-5.4-nano`             | Modelo                                           |
-| LOG_LEVEL                   | `DEBUG`                    | Nível de log                                     |
-| ALGORITHM                   | `HS256`                    | Algoritmo do JWT                                 |
-| ACCESS_TOKEN_EXPIRE_MINUTES | `30`                       | Validade do access token                         |
-| REFRESH_TOKEN_EXPIRE_DAYS   | `7`                        | Validade do refresh token e do cookie            |
-| COOKIE_SECURE               | `false`                    | `true` em produção (cookie só por HTTPS)         |
+| Variável                   | Padrão                      | Descrição                                                             |
+| --------------------------- | ---------------------------- | ----------------------------------------------------------------------- |
+| AI_PROVIDER                 | `openai`                   | Provedor do modelo                                                      |
+| AI_MODEL                    | `gpt-5.4-nano`             | Modelo                                                                  |
+| LOG_LEVEL                   | `DEBUG`                    | Nível de log                                                           |
+| ALGORITHM                   | `HS256`                    | Algoritmo do JWT                                                        |
+| ACCESS_TOKEN_EXPIRE_MINUTES | `30`                       | Validade do access token                                                |
+| REFRESH_TOKEN_EXPIRE_DAYS   | `7`                        | Validade do refresh token e do cookie                                   |
+| COOKIE_SECURE               | `false`                    | `true` em produção (cookie só por HTTPS)                           |
 | COOKIE_SAMESITE             | `lax`                      | `lax`, `strict` ou `none` (`none` exige `COOKIE_SECURE=true`) |
-| COOKIE_DOMAIN               | vazio                      | Domínio do cookie (ex.: `.exemplo.com`)          |
-| CORS_ORIGINS                | `http://localhost:3000`    | Origens do front liberadas, separadas por vírgula|
-| REDIS_URL                   | `redis://localhost:6379/0` | Endereço do Redis                                |
-| DEBOUNCE_SECONDS            | `7`                        | Janela para agrupar mensagens                    |
-| DEBOUNCE_LEASE_SECONDS      | `120`                      | Tempo máximo de retenção do usuário pelo worker  |
-| DEBOUNCE_RETRY_SECONDS      | `15`                       | Intervalo entre tentativas                       |
-| DEBOUNCE_MAX_ATTEMPTS       | `3`                        | Máximo de tentativas por ciclo                   |
-| WORKER_IN_API               | `true`                     | Executa o worker dentro da API                   |
-| WORKER_CONCURRENCY          | `10`                       | Usuários processados em paralelo                 |
-| MESSAGING_PROVIDER          | `evolution`                | Provedor de mensagens                            |
+| COOKIE_DOMAIN               | vazio                        | Domínio do cookie (ex.:`.exemplo.com`)                               |
+| CORS_ORIGINS                | `http://localhost:3000`    | Origens do front liberadas, separadas por vírgula                      |
+| REDIS_URL                   | `redis://localhost:6379/0` | Endereço do Redis                                                      |
+| DEBOUNCE_SECONDS            | `7`                        | Janela para agrupar mensagens                                           |
+| DEBOUNCE_LEASE_SECONDS      | `120`                      | Tempo máximo de retenção do usuário pelo worker                     |
+| DEBOUNCE_RETRY_SECONDS      | `15`                       | Intervalo entre tentativas                                              |
+| DEBOUNCE_MAX_ATTEMPTS       | `3`                        | Máximo de tentativas por ciclo                                         |
+| WORKER_IN_API               | `true`                     | Executa o worker dentro da API                                          |
+| WORKER_CONCURRENCY          | `10`                       | Usuários processados em paralelo                                       |
+| MESSAGING_PROVIDER          | `evolution`                | Provedor de mensagens                                                   |
 
 Gerar uma `SECRET_KEY` segura:
 
@@ -139,11 +139,11 @@ python -c "import secrets; print(secrets.token_urlsafe(48))"
 
 # Documentação
 
-| Documento                            | Conteúdo                                                  |
-| ------------------------------------ | --------------------------------------------------------- |
-| [docs/dev.md](docs/dev.md)           | Ambiente local, execução, webhook, worker e front         |
-| [docs/database.md](docs/database.md) | Tabelas, campos, índices e migrações                      |
-| [docs/api.md](docs/api.md)           | Rotas, Swagger, tipos e uso dos tokens                    |
+| Documento                           | Conteúdo                                           |
+| ----------------------------------- | --------------------------------------------------- |
+| [docs/dev.md](docs/dev.md)           | Ambiente local, execução, webhook, worker e front |
+| [docs/database.md](docs/database.md) | Tabelas, campos, índices e migrações             |
+| [docs/api.md](docs/api.md)           | Rotas, Swagger, tipos e uso dos tokens              |
 
 Swagger: `http://localhost:8000/docs`
 

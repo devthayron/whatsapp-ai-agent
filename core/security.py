@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import jwt
 
@@ -11,7 +11,7 @@ def create_token(
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    exp = datetime.now(timezone.utc) + expires_delta
+    exp = datetime.now(UTC) + expires_delta
 
     payload = {
         "sub": str(account_id),

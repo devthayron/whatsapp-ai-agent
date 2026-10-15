@@ -12,7 +12,6 @@ setup_logging()
 
 from app.routes.auth import router as auth_router
 from app.routes.chat import router as chat_router
-from app.routes.webhook_evolution import router as webhook_router
 
 
 @asynccontextmanager
@@ -46,6 +45,13 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(chat_router)
+
+# Só expõe o webhook do provedor ativo (e só importa o cliente dele).
+if settings.MESSAGING_PROVIDER == "meta":
+    from app.routes.webhook_meta import router as webhook_router
+else:
+    from app.routes.webhook_evolution import router as webhook_router
+
 app.include_router(webhook_router)
 
 
