@@ -135,7 +135,7 @@ def test_processes_message_and_replies_to_sender(client, calls):
 
     assert response.status_code == 200
     assert len(calls["enqueued"]) == 1
-    assert calls["enqueued"][0].external_id == "meta_wamid.1"
+    assert calls["enqueued"][0].external_id == "wamid.1"
     assert calls["sent"] == [("5511999999999", "resposta simulada")]
 
 

@@ -56,7 +56,7 @@ def test_builds_message_received(make_payload):
 
     assert result == [
         MessageReceived(
-            external_id="meta_wamid.1",
+            external_id="wamid.1",
             number="5511999999999",
             name="Fulano",
             content="Oi, tudo bem?",
@@ -81,7 +81,7 @@ def test_extracts_multiple_messages(make_payload):
     result = extract_messages(make_payload(messages=messages))
 
     assert [m.content for m in result] == ["a", "b"]
-    assert [m.external_id for m in result] == ["meta_wamid.1", "meta_wamid.2"]
+    assert [m.external_id for m in result] == ["wamid.1", "wamid.2"]
 
 
 def test_ignores_status_events(make_payload):

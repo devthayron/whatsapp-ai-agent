@@ -80,7 +80,7 @@ Histórico: mensagens do usuário e respostas da IA.
 | Campo        | Tipo          | Nulo | Chave                      | Descrição                                         |
 | ------------ | ------------- | ---- | -------------------------- | ------------------------------------------------- |
 | id           | `INTEGER`     | Não  | PK                         | Identificador (define a ordem do histórico)       |
-| external_id  | `VARCHAR`     | Sim  | Único, indexado            | Id no provedor, ex.: `meta_wamid.HBgM...`         |
+| external_id  | `VARCHAR`     | Sim  | Único, indexado            | Id da mensagem no provedor, ex.: `wamid.HBgM...`  |
 | user_id      | `INTEGER`     | Não  | FK → `users.id`, indexado  | Dono da conversa                                  |
 | role         | `VARCHAR`     | Não  | —                          | `user` ou `assistant`                             |
 | content      | `VARCHAR`     | Não  | —                          | Texto                                             |
@@ -89,7 +89,7 @@ Histórico: mensagens do usuário e respostas da IA.
 
 Regras:
 
-* **Duplicidade:** `external_id` único impede gravar a mesma mensagem duas vezes (a Meta pode reenviar o mesmo evento). O prefixo (`meta_`) evita colisão entre provedores; registros antigos com `evolution_` continuam válidos.
+* **Duplicidade:** `external_id` único impede gravar a mesma mensagem duas vezes (a Meta pode reenviar o mesmo evento). O valor é o id original da Meta (`wamid...`), sem prefixo. Registros antigos com prefixo `meta_` ou `evolution_` continuam válidos.
 * **Sem id do provedor:** `external_id` fica `NULL` e não há deduplicação. Respostas da IA também usam `NULL`.
 * **`sent_at`:** usa o timestamp da mensagem, ou o horário atual se não houver. Valores numéricos são convertidos para `America/Sao_Paulo`.
 * **Resposta da IA** só é salva depois de enviada.

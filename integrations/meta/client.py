@@ -41,6 +41,7 @@ class MetaService:
             response = self.session.post(
                 self.url, json=payload, timeout=REQUEST_TIMEOUT
             )
+
             response.raise_for_status()
         except requests.HTTPError as exc:
             try:

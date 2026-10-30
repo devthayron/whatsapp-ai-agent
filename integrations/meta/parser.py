@@ -6,6 +6,7 @@ from config import settings
 def _normalize_text_message(
     message: dict, contacts: dict[str, str | None]
 ) -> MessageReceived | None:
+
     if message.get("type") != "text":
         return None
 
@@ -18,7 +19,7 @@ def _normalize_text_message(
     timestamp = str(message.get("timestamp") or "")
 
     return MessageReceived(
-        external_id=f"meta_{message_id}" if message_id else None,
+        external_id=message_id,
         number=number,
         name=contacts.get(number),
         content=body.strip(),
@@ -29,6 +30,7 @@ def _normalize_text_message(
 
 def extract_messages(payload: dict) -> list[MessageReceived]:
     """Extrai as mensagens de texto válidas de um webhook da Meta."""
+
     if payload.get("object") != "whatsapp_business_account":
         return []
 
