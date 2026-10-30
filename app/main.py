@@ -32,7 +32,12 @@ async def lifespan(app: FastAPI):
         await task
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(
+    lifespan=lifespan,
+    docs_url="/docs" if settings.ENABLE_DOCS else None,
+    redoc_url="/redoc" if settings.ENABLE_DOCS else None,
+    openapi_url="/openapi.json" if settings.ENABLE_DOCS else None,
+)
 
 # Necessário para o front no navegador. Com cookies (allow_credentials=True),
 # as origens precisam ser explícitas: "*" não funciona.

@@ -2,7 +2,7 @@ from collections.abc import Generator
 
 import jwt
 from fastapi import Cookie, Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordBearer
 from pwdlib import PasswordHash
 from sqlalchemy.orm import Session
 
@@ -13,8 +13,12 @@ from database.models import Account
 password_hasher = PasswordHash.recommended()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login-oauth2")
+http_basic = HTTPBasic()
 
 REFRESH_COOKIE = "refresh_token"
+
+# Hash fictício: iguala o tempo de resposta quando o email não existe
+_DUMMY_HASH = password_hasher.hash("senha-ficticia-para-igualar-tempo")
 
 
 def get_session() -> Generator[Session, None, None]:
@@ -91,3 +95,26 @@ def verify_refresh_token(
     session: Session = Depends(get_session),  # noqa: B008
 ) -> Account:
     return verify_token_type(token, session, "refresh")
+
+
+def verify_basic(
+    credentials: HTTPBasicCredentials = Depends(http_basic),  # noqa: B008
+    session: Session = Depends(get_session),  # noqa: B008
+) -> Account:
+    """Autenticação do navegador para /docs, /redoc e /openapi.json."""
+    account = (
+        session.query(Account).filter(Account.email == credentials.username).first()
+    )
+
+    password_ok = password_hasher.verify(
+        credentials.password, account.hashed_password if account else _DUMMY_HASH
+    )
+
+    if not account or not password_ok or not account.is_active:
+        raise HTTPException(
+            status_code=401,
+            detail="Credenciais inválidas",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+
+    return account

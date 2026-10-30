@@ -6,6 +6,7 @@ os.environ.setdefault("META_PHONE_NUMBER_ID", "100000000000001")
 os.environ.setdefault("META_APP_SECRET", "test-meta-app-secret")
 os.environ.setdefault("META_VERIFY_TOKEN", "test-meta-verify-token")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-with-at-least-32-bytes")
+os.environ.setdefault("ALLOW_REGISTRATION", "true")
 # Forçado: os testes nunca podem apontar para o Postgres real
 os.environ["DATABASE_URL"] = "sqlite://"
 

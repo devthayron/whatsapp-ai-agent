@@ -34,7 +34,7 @@ async def verify_signature(
     return body
 
 
-@router.get("")
+@router.get("", include_in_schema=False)
 def verify_webhook(
     hub_mode: str | None = Query(default=None, alias="hub.mode"),
     hub_verify_token: str | None = Query(default=None, alias="hub.verify_token"),
@@ -50,7 +50,7 @@ def verify_webhook(
     raise HTTPException(status_code=403, detail="Forbidden")
 
 
-@router.post("")
+@router.post("", include_in_schema=False)
 def webhook(raw_body: bytes = Depends(verify_signature)):
     """Extrai as mensagens do evento e as envia para a fila."""
     try:

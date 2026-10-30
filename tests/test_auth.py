@@ -3,7 +3,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.routes.auth import router as auth_router
-from dependencies import get_session
+from database.models import Account
+from dependencies import get_session, password_hasher
 
 CREDENTIALS = {"email": "maria@exemplo.com", "password": "senha-forte-123"}
 
@@ -14,9 +15,17 @@ def client(db_session):
     api.include_router(auth_router)
     api.dependency_overrides[get_session] = lambda: db_session
 
-    client = TestClient(api)
-    client.post("/auth/register", json={"name": "Maria", **CREDENTIALS})
-    return client
+    # O cadastro exige login: a primeira conta nasce direto no banco
+    db_session.add(
+        Account(
+            name="Maria",
+            email=CREDENTIALS["email"],
+            hashed_password=password_hasher.hash(CREDENTIALS["password"]),
+        )
+    )
+    db_session.commit()
+
+    return TestClient(api)
 
 
 def test_login_sets_httponly_cookie_and_hides_refresh_token(client):
@@ -79,3 +88,28 @@ def test_me_requires_access_token(client):
 
     assert response.status_code == 200
     assert response.json()["email"] == CREDENTIALS["email"]
+
+
+def test_register_requires_authentication(client):
+    body = {"email": "novo@exemplo.com", "password": "outra-senha-forte"}
+
+    assert client.post("/auth/register", json=body).status_code == 401
+
+    access = client.post("/auth/login", json=CREDENTIALS).json()["access_token"]
+    response = client.post(
+        "/auth/register", json=body, headers={"Authorization": f"Bearer {access}"}
+    )
+
+    assert response.status_code == 200
+
+
+def test_register_rejects_short_password(client):
+    access = client.post("/auth/login", json=CREDENTIALS).json()["access_token"]
+
+    response = client.post(
+        "/auth/register",
+        json={"email": "novo@exemplo.com", "password": "curta"},
+        headers={"Authorization": f"Bearer {access}"},
+    )
+
+    assert response.status_code == 422

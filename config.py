@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     WORKER_IN_API: bool = True
     WORKER_CONCURRENCY: int = 10
 
+    # Superfície exposta: fechada por padrão (modo produção)
+    ENABLE_DOCS: bool = False  # /docs, /redoc, /openapi.json (exigem login Basic)
+    ENABLE_CHAT_ROUTE: bool = False  # POST /chat/
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -56,9 +60,11 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.CORS_ORIGINS.split(",") if o.strip()]
 
     @model_validator(mode="after")
-    def _check_cookie_settings(self):
+    def _check_settings(self):
         if self.COOKIE_SAMESITE == "none" and not self.COOKIE_SECURE:
             raise ValueError("COOKIE_SAMESITE=none exige COOKIE_SECURE=true")
+        if len(self.SECRET_KEY) < 32:
+            raise ValueError("SECRET_KEY precisa ter pelo menos 32 caracteres")
         return self
 
 

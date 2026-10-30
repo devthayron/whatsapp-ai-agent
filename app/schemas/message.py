@@ -1,14 +1,14 @@
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MessageReceived(BaseModel):
     external_id: str | None = None
     number: str
     name: str | None = None
-    content: str
+    content: str = Field(min_length=1, max_length=4096)
     content_type: str = "text"
     timestamp: int | float | datetime | None = None
 

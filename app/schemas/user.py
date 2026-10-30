@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserSchema(BaseModel):
@@ -12,9 +12,9 @@ class UserSchema(BaseModel):
 class AccountCreate(BaseModel):
     name: str | None = None
     email: EmailStr
-    password: str
+    password: str = Field(min_length=10, max_length=128)
 
 
 class AccountLogin(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=1, max_length=128)

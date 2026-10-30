@@ -70,10 +70,18 @@ def authenticate_account(email: str, password: str, session: Session) -> Account
 @router.post(
     "/register",
     response_model=MessageResponse,
-    summary="Cria uma conta",
-    responses={400: {"model": ErrorResponse, "description": "Email já cadastrado"}},
+    summary="Cria uma conta (exige conta autenticada)",
+    responses={
+        **UNAUTHORIZED,
+        **INACTIVE,
+        400: {"model": ErrorResponse, "description": "Email já cadastrado"},
+    },
 )
-def register(account: AccountCreate, session: Session = Depends(get_session)):  # noqa: B008
+def register(
+    account: AccountCreate,
+    session: Session = Depends(get_session),  # noqa: B008
+    current_account: Account = Depends(verify_token),  # noqa: B008
+):
     existing_account = (
         session.query(Account).filter(Account.email == account.email).first()
     )
