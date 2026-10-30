@@ -166,14 +166,14 @@ Erros comuns ao enviar o JSON pelo Swagger:
 
 # Problemas comuns com a Meta
 
-| Sintoma                                        | Causa provável                                                                 |
-| ---------------------------------------------- | ------------------------------------------------------------------------------ |
+| Sintoma                                        | Causa provável                                                                         |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------- |
 | "Verify and save" falha                        | API fora do ar, URL errada (falta `/webhook/meta`) ou `META_VERIFY_TOKEN` diferente |
-| Mensagens não chegam                           | Campo `messages` não assinado, ou ngrok com URL antiga                         |
-| `401` no webhook                               | `META_APP_SECRET` errado (a assinatura não confere)                            |
-| Para de responder depois de ~24h               | Token temporário do painel expirou: use o token do System User                 |
-| Erro ao enviar para um número                  | Número de teste: o destinatário precisa estar cadastrado no painel             |
-| Erro ao enviar depois de um tempo sem conversa | Janela de 24h expirada (texto livre só vale dentro dela)                       |
+| Mensagens não chegam                          | Campo `messages` não assinado, ou ngrok com URL antiga                               |
+| `401` no webhook                             | `META_APP_SECRET` errado (a assinatura não confere)                                  |
+| Para de responder depois de ~24h               | Token temporário do painel expirou: use o token do System User                         |
+| Erro ao enviar para um número                 | Número de teste: o destinatário precisa estar cadastrado no painel                    |
+| Erro ao enviar depois de um tempo sem conversa | Janela de 24h expirada (texto livre só vale dentro dela)                               |
 
 ---
 
