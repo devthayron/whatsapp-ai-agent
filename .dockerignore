@@ -1,0 +1,13 @@
+.env
+.git
+venv
+__pycache__/
+*.pyc
+logs/
+data/
+.pytest_cache
+tests/
+docs/
+teste.py
+password.txt
+assets/
